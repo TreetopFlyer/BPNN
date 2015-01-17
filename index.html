@@ -423,18 +423,18 @@ TrainingVectorViz.Update = function(inTrainingVectorViz)
 
 <script>
 	var n1 = Neuron.Create();
-	Neuron.Setup.Model(n1, [Math.random(), Math.random()], Math.random()*100, Neuron.Observing.Binary);
-	Neuron.Setup.Learning(n1, 0.1, 1, Neuron.Learning.Coarse);		
+	Neuron.Setup.Model(n1, [Math.random(), Math.random()], Math.random()*100, Neuron.Observing.Linear);
+	Neuron.Setup.Learning(n1, 0.001, 0.1, Neuron.Learning.Coarse);		
 	NeuronViz.Create(n1);
 
 	
-	var t1 = TrainingVector.Create([100, 100], [0]);
+	var t1 = TrainingVector.Create([100, 100], [-1]);
 	TrainingVectorViz.Create(t1, "TypeA");
 	
-	var t2 = TrainingVector.Create([150, 110], [0]);
+	var t2 = TrainingVector.Create([150, 110], [-1]);
 	TrainingVectorViz.Create(t2, "TypeA");
 	
-	var t3 = TrainingVector.Create([200, 180], [0]);
+	var t3 = TrainingVector.Create([200, 180], [-1]);
 	TrainingVectorViz.Create(t3, "TypeA");
 	
 	var t4 = TrainingVector.Create([-200, -180], [1]);
@@ -448,41 +448,57 @@ TrainingVectorViz.Update = function(inTrainingVectorViz)
 	
 	
 	var timer = setInterval(function(){
-		advance();
-		train();
+		tally();
 		NeuronViz.Update();
-	}, 50);
+	}, 100);
 	
-	var trainingIndex = 0;
-	function advance()
+	/*
+	function tally()
 	{
-		trainingIndex++;
-		if(trainingIndex >= TrainingVector.Instances.length)
-			trainingIndex = 0;
-	}
-	function train()
-	{
-		var v = TrainingVector.Instances[trainingIndex];		
-	
-		/*
-		console.log("TRAINING", trainingIndex, ":", v.Pos, "as", v.Type);
-		console.log("... start weights:", n1.Model.Weights);
-		*/
-		
-		//set input and observe
-		n1.Observing.Input = v.Pos;
-		Neuron.Utilities.Observe(n1);
-	
-		// set error and learn
-		n1.Learning.Error = v.Type[0] - n1.Observing.Output;
+		var v;
+		var miss;
+		var summedError = 0;
+		n1.Learning.Error = 0;
+		for(var i=0; i<TrainingVector.Instances.length; i++)
+		{
+			n1.Observing.Input = TrainingVector.Instances[i].Pos;
+			Neuron.Utilities.Observe(n1);
+			
+			miss = TrainingVector.Instances[i].Type[0] - n1.Observing.Output;
+			
+			if(TrainingVector.Instances[i].Type[0] == -1 && n1.Observing.Output >= 0)
+				n1.Learning.Error += miss;
+			
+			if(TrainingVector.Instances[i].Type[1] == 1 && n1.Observing.Output < 0)
+				n1.Learning.Error += miss;
+			
+			console.log(n1.Learning.Error);
+		}
 		Neuron.Utilities.Learn(n1);
-		
-		/*
-		console.log("... raw:", n1.Observing.Raw);
-		console.log("... output:", n1.Observing.Output);		
-		console.log("... error:", n1.Learning.Error);
-		console.log("... end weights:", n1.Model.Weights);
-		*/
+	}
+	*/
+	function tally()
+	{
+		var v;
+		var miss;
+		var summedError = 0;
+		n1.Learning.Error = 0;
+		for(var i=0; i<TrainingVector.Instances.length; i++)
+		{
+			n1.Observing.Input = TrainingVector.Instances[i].Pos;
+			Neuron.Utilities.Observe(n1);
+			
+			miss = TrainingVector.Instances[i].Type[0] - n1.Observing.Output;
+			
+			if(TrainingVector.Instances[i].Type[0] == -1 && n1.Observing.Output >= 0)
+				summedError += miss;
+			
+			if(TrainingVector.Instances[i].Type[1] == 1 && n1.Observing.Output < 0)
+				summedError += miss;
+		}
+		n1.Learning.Error = (summedError*summedError)/1000;
+		console.log(summedError);
+		Neuron.Utilities.Learn(n1);
 	}
 	
 
