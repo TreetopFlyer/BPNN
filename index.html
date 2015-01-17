@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
+		<style>
+
+			body, html
+			{
+				position:absolute;
+				top:0px;
+				left:0px;
+				width:100%;
+				height:100%;
+				
+				margin:0px;
+				padding:0px;
+				border:0px;
+				
+				background:#aaa;
+				overflow:hidden;
+			}
+			
+			#GridH
+			{
+				position:absolute;
+				top:50%;
+				left:0%;
+				width:100%;
+				height:100px;
+				
+				border-top:1px dashed #ccc;
+			}
+			#GridV
+			{
+				position:absolute;
+				top:0%;
+				left:50%;
+				width:100px;
+				height:100%;
+				
+				border-left:1px dashed #ccc;
+			}
+			
+			#Neurons, #TrainingVectors
+			{
+				position:absolute;
+				top:50%;
+				left:50%;
+			}
+			
+			#Neurons .Container
+			{
+				position:absolute;
+				width:0px;
+				height:0px;
+			}
+			#Neurons .Container .Offset
+			{
+				position:absolute;
+				top:-2px;
+				left:-2px;
+				width:4px;
+				height:4px;
+				background:#333;
+			}
+			#Neurons .Container .Offset .Line
+			{
+				position:absolute;
+				top:-500px;
+				left:0px;
+				width:2px;
+				height:1000px;
+				border-left:2px solid #fff;
+				border-right:2px solid #000;
+			}
+			
+			#TrainingVectors .Container
+			{
+				display:block;
+				position:absolute;
+				width:0px;
+				height:0px;
+			}
+			#TrainingVectors .Container .Offset
+			{
+				position:absolute;
+				top:-5px;
+				left:-5px;
+				width:10px;
+				height:10px;
+				
+				background:#F00;
+				cursor:pointer;
+				border-radius:3px;
+				box-shadow:1px 1px 5px #333;
+			}
+			#TrainingVectors .TypeA .Offset
+			{
+				background:#fff;
+			}
+			#TrainingVectors .TypeB .Offset
+			{
+				background:#000;
+			}
+			
+		</style>
+	</head>
+	<body>
+	
+		<div id="GridH"></div>
+		<div id="GridV"></div>
+		<div id="Neurons"></div>
+		<div id="TrainingVectors"></div>
+	
+	</body>
+		<script>
+var Pad = {};
+
+Pad.Init = function()
+{
+	Pad.JQ.Document = $(document);
+	Pad.JQ.Document.mousedown(Pad.Handler.Down);
+	Pad.JQ.Document.mouseup(Pad.Handler.Up);
+};
+
+// position vectors
+Pad.Position = {};
+Pad.Position.Update = {X:0, Y:0}; // mouse update relative (delta)
+Pad.Position.Stroke = {X:0, Y:0}; // drag stroke relative
+Pad.Position.Session = {X:0, Y:0}; // page session relative
+Pad.Position.Old = {X:0, Y:0};
+Pad.Position.New = {X:0, Y:0};
+
+// jquery elements
+Pad.JQ = {};
+Pad.JQ.Document = $();
+Pad.JQ.Drag = $();
+
+// custom handlers
+Pad.User = {};
+Pad.User.Down = function(){};
+Pad.User.Move = function(){};
+Pad.User.Up = function(){};
+
+// internal handlers
+Pad.Handler = {};
+Pad.Handler.Down = function(e)
+{
+	Pad.Position.Stroke = {X:0, Y:0};
+	Pad.Position.Old.X = e.pageX;
+	Pad.Position.Old.Y = e.pageY;
+	Pad.JQ.Document.bind("mousemove", Pad.Handler.Move);
+	
+	Pad.User.Down();
+};
+Pad.Handler.Move = function(e)
+{
+	Pad.Position.New.X = e.pageX;
+	Pad.Position.New.Y = e.pageY;
+	
+	Pad.Position.Update.X = Pad.Position.New.X - Pad.Position.Old.X;
+	Pad.Position.Update.Y = Pad.Position.New.Y - Pad.Position.Old.Y;
+	Pad.Position.Session.X += Pad.Position.Update.X
+	Pad.Position.Session.Y += Pad.Position.Update.Y;
+	Pad.Position.Stroke.X += Pad.Position.Update.X
+	Pad.Position.Stroke.Y += Pad.Position.Update.Y;
+
+	Pad.Position.Old.X = Pad.Position.New.X;
+	Pad.Position.Old.Y = Pad.Position.New.Y;
+	
+	Pad.User.Move();
+};
+Pad.Handler.Up = function(e)
+{
+	Pad.JQ.Document.unbind("mousemove", Pad.Handler.Move);
+	
+	Pad.User.Up();
+};
+Pad.Init();
+		</script>
+
+
+
+	
+<script>
+
+var Neuron = {};
+
+// neuron learning rules
+Neuron.Learning = {};
+Neuron.Learning.Coarse = function(inNeuron)
+{
+	var i;
+	for(i=0; i<inNeuron.Model.Weights.length; i++)
+	{
+		inNeuron.Model.Weights[i] += inNeuron.Learning.RateWeights * inNeuron.Learning.Error * inNeuron.Observing.Input[i];
+	}
+	inNeuron.Model.Bias -= inNeuron.Learning.RateBias * inNeuron.Learning.Error;
+};
+
+// neuron activation functions
+Neuron.Observing = {};
+Neuron.Observing.Binary = function(inNeuron)
+{
+	if(inNeuron.Observing.Raw < 0)
+		inNeuron.Observing.Output = 0;
+	else
+		inNeuron.Observing.Output = 1;
+};
+Neuron.Observing.Linear = function(inNeuron)
+{
+	inNeuron.Observing.Output = inNeuron.Observing.Raw;
+};
+
+
+/*
+	Generic Utility functions
+*/
+Neuron.Utilities = {};
+/*
+	Make a neuron observe its input and produce a raw output (Observing.Raw).
+	This output is literally the dot product of the input and normalized weight vector, with the bias factored in.
+*/
+Neuron.Utilities.Raw = function(inNeuron)
+{
+	var i = 0;
+	var sum = 0;
+	for(i=0; i<inNeuron.Model.WeightsNormalized.length; i++)
+	{
+		sum += inNeuron.Model.WeightsNormalized[i] * inNeuron.Observing.Input[i];
+	}
+	inNeuron.Observing.Raw = sum - inNeuron.Model.Bias;
+};
+/*
+	Normalize a neuron's weight vector.
+	The normalized vector is stored as a copy of the un-normalized weight vector (Model.WeightsNormalized).
+*/
+Neuron.Utilities.Normalize = function(inNeuron)
+{
+	var sum = 0;
+	var length = 0;
+	var i = 0;
+	for(i=0; i<inNeuron.Model.Weights.length; i++)
+	{
+		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
+	}
+	length = Math.sqrt(sum);
+	inNeuron.Model.WeightsNormalized = [];
+	for(i=0; i<inNeuron.Model.Weights.length; i++)
+	{
+		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
+	}
+};
+
+Neuron.Utilities.Observe = function(inNeuron)
+{
+	Neuron.Utilities.Raw(inNeuron);
+	inNeuron.Observing.Function(inNeuron);
+};
+Neuron.Utilities.Learn = function(inNeuron)
+{
+	inNeuron.Learning.Function(inNeuron);
+	Neuron.Utilities.Normalize(inNeuron);
+	inNeuron.Learning.Era++;
+};
+
+Neuron.Create = function()
+{
+	var obj = {};
+	
+	obj.Model = {};
+	obj.Model.Weights = {};
+	obj.Model.WeightsNormalized = {};
+	obj.Model.Bias = 0;
+
+	obj.Learning = {};
+	obj.Learning.Era = 0;
+	obj.Learning.Error = 0;
+	obj.Learning.RateWeights = 0;
+	obj.Learning.RateBias = 0;
+	obj.Learning.Function = function(inNeuron){};
+	
+	obj.Observing = {};
+	obj.Observing.Input = {};
+	obj.Observing.Raw = 0;
+	obj.Observing.Output = 0;
+	obj.Observing.Function = function(inNeuron){};
+	
+	return obj;
+};
+Neuron.Setup = {};
+Neuron.Setup.Model = function(inNeuron, inWeights, inBias, inObserving)
+{
+	inNeuron.Model.Weights = inWeights;
+	inNeuron.Model.Bias = inBias;
+	inNeuron.Observing.Function = inObserving;
+	Neuron.Utilities.Normalize(inNeuron);
+};
+Neuron.Setup.Learning = function(inNeuron, inRateWeights, inRateBias, inLearning)
+{
+	inNeuron.Learning.RateWeights = inRateWeights;
+	inNeuron.Learning.RateBias = inRateBias;
+	inNeuron.Learning.Function = inLearning;
+};
+</script>
+
+<script>
+var NeuronViz = {};
+NeuronViz.Instances = [];
+NeuronViz.JQ = {};
+NeuronViz.JQ.Contianer = $("#Neurons");
+NeuronViz.CSS = {};
+NeuronViz.CSS.ClassContainer = "Container";
+NeuronViz.CSS.ClassOffset = "Offset";
+NeuronViz.CSS.ClassLine = "Line";
+NeuronViz.Create = function(inNeuron)
+{
+	var obj = {};
+	obj.Neuron = inNeuron;
+	
+	obj.JQ = {};
+	obj.JQ.Container = $("<div class=\""+NeuronViz.CSS.ClassContainer+"\"></div>");
+	obj.JQ.Offset = $("<div class=\""+NeuronViz.CSS.ClassOffset+"\"></div>");
+	obj.JQ.Line = $("<div class=\""+NeuronViz.CSS.ClassLine+"\"></div>");
+	
+	obj.JQ.Offset.append(obj.JQ.Line);
+	obj.JQ.Container.append(obj.JQ.Offset);
+	NeuronViz.JQ.Contianer.append(obj.JQ.Container);
+	
+	NeuronViz.Instances.push(obj);
+	return obj;
+};
+NeuronViz.Update = function()
+{
+	var i;
+	var current;
+	var x, y;
+	var rad, deg;
+	for(i=0; i<NeuronViz.Instances.length; i++)
+	{
+		current = NeuronViz.Instances[i];
+		
+		x = current.Neuron.Model.WeightsNormalized[0] * current.Neuron.Model.Bias;
+		y = current.Neuron.Model.WeightsNormalized[1] * current.Neuron.Model.Bias;
+
+		rad = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0]);
+		deg = rad*(180/3.14);		
+		
+		current.JQ.Container.css({left:(x)+"px", top:(y)+"px", "-webkit-transform":"rotate("+deg+"deg)"});
+	};
+};
+
+</script>
+<script>
+var TrainingVector = {};
+TrainingVector.Instances = [];
+TrainingVector.Create = function(inPos, inType)
+{
+	var obj = {};
+
+	obj.Pos = inPos;
+	obj.Type = inType;
+	
+	TrainingVector.Instances.push(obj);
+	return obj;
+};
+</script>
+<script>
+var TrainingVectorViz = {};
+TrainingVectorViz.JQ = {};
+TrainingVectorViz.JQ.Container = $("#TrainingVectors");
+TrainingVectorViz.JQ.Document = $(document); 
+TrainingVectorViz.CSS = {};
+TrainingVectorViz.CSS.ClassContainer = "Container";
+TrainingVectorViz.CSS.ClassOffset = "Offset";
+TrainingVectorViz.Instances = [];
+
+TrainingVectorViz.Create = function(inTrainingVector, inCSSClass)
+{
+	var obj = {};
+	
+	obj.TrainingVector = inTrainingVector;
+	
+	obj.JQ = {};
+	obj.JQ.Container = $("<div class=\""+TrainingVectorViz.CSS.ClassContainer+" "+inCSSClass+"\"></div>");
+	obj.JQ.Offset = $("<div class=\""+TrainingVectorViz.CSS.ClassOffset+"\"></div>");
+	
+	//-webkit-transform: rotate(7deg);
+	
+	obj.Handlers = {};
+	obj.Handlers.MouseDown = function(e)
+	{
+		obj.JQ.Container.unbind("mousedown", obj.Handlers.MouseDown);
+		TrainingVectorViz.JQ.Document.bind("mousemove", obj.Handlers.MouseMove);
+		TrainingVectorViz.JQ.Document.bind("mouseup", obj.Handlers.MouseUp);
+	};
+	obj.Handlers.MouseMove = function(e)
+	{
+		obj.TrainingVector.Pos[0] += Pad.Position.Update.X;
+		obj.TrainingVector.Pos[1] += Pad.Position.Update.Y;
+		TrainingVectorViz.Update(obj);
+	};
+	obj.Handlers.MouseUp = function(e)
+	{
+		TrainingVectorViz.JQ.Document.unbind("mousemove", obj.Handlers.MouseMove);
+		TrainingVectorViz.JQ.Document.unbind("mouseup", obj.Handlers.MouseUp);
+		obj.JQ.Container.bind("mousedown", obj.Handlers.MouseDown);
+	};
+	obj.Handlers.MouseUp();
+	
+	obj.JQ.Container.append(obj.JQ.Offset);
+	TrainingVectorViz.JQ.Container.append(obj.JQ.Container);
+	TrainingVectorViz.Instances.push(obj);
+	TrainingVectorViz.Update(obj);
+	return obj;
+};
+TrainingVectorViz.Update = function(inTrainingVectorViz)
+{
+	inTrainingVectorViz.JQ.Container.css({left:(inTrainingVectorViz.TrainingVector.Pos[0])+"px", top:(inTrainingVectorViz.TrainingVector.Pos[1])+"px"});
+};
+</script>
+
+
+<script>
+	var n1 = Neuron.Create();
+	Neuron.Setup.Model(n1, [Math.random(), Math.random()], Math.random()*100, Neuron.Observing.Binary);
+	Neuron.Setup.Learning(n1, 0.1, 1, Neuron.Learning.Coarse);		
+	NeuronViz.Create(n1);
+
+	
+	var t1 = TrainingVector.Create([100, 100], [0]);
+	TrainingVectorViz.Create(t1, "TypeA");
+	
+	var t2 = TrainingVector.Create([150, 110], [0]);
+	TrainingVectorViz.Create(t2, "TypeA");
+	
+	var t3 = TrainingVector.Create([200, 180], [0]);
+	TrainingVectorViz.Create(t3, "TypeA");
+	
+	var t4 = TrainingVector.Create([-200, -180], [1]);
+	TrainingVectorViz.Create(t4, "TypeB");
+	
+	var t5 = TrainingVector.Create([-250, -180], [1]);
+	TrainingVectorViz.Create(t5, "TypeB");
+	
+	var t6 = TrainingVector.Create([-250, -20], [1]);
+	TrainingVectorViz.Create(t6, "TypeB");
+	
+	
+	var timer = setInterval(function(){
+		advance();
+		train();
+		NeuronViz.Update();
+	}, 50);
+	
+	var trainingIndex = 0;
+	function advance()
+	{
+		trainingIndex++;
+		if(trainingIndex >= TrainingVector.Instances.length)
+			trainingIndex = 0;
+	}
+	function train()
+	{
+		var v = TrainingVector.Instances[trainingIndex];		
+	
+		/*
+		console.log("TRAINING", trainingIndex, ":", v.Pos, "as", v.Type);
+		console.log("... start weights:", n1.Model.Weights);
+		*/
+		
+		//set input and observe
+		n1.Observing.Input = v.Pos;
+		Neuron.Utilities.Observe(n1);
+	
+		// set error and learn
+		n1.Learning.Error = v.Type[0] - n1.Observing.Output;
+		Neuron.Utilities.Learn(n1);
+		
+		/*
+		console.log("... raw:", n1.Observing.Raw);
+		console.log("... output:", n1.Observing.Output);		
+		console.log("... error:", n1.Learning.Error);
+		console.log("... end weights:", n1.Model.Weights);
+		*/
+	}
+	
+
+	
+</script>
+
+
+</html>
