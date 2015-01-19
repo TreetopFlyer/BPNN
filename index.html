@@ -16,7 +16,7 @@
 				padding:0px;
 				border:0px;
 				
-				background:#aaa;
+				background:#777;
 				overflow:hidden;
 			}
 			
@@ -51,24 +51,24 @@
 			#Neurons .Container
 			{
 				position:absolute;
+				left:0px;
+				top:0px;
 				width:0px;
 				height:0px;
 			}
-			#Neurons .Container .Offset
+			#Neurons .Container .Bias
 			{
 				position:absolute;
 				top:-2px;
-				left:-2px;
-				width:4px;
-				height:4px;
-				background:#333;
+				left:0px;
+				border-top:3px dotted #ccc;
 			}
-			#Neurons .Container .Offset .Line
+			#Neurons .Container .Line
 			{
 				position:absolute;
 				top:-500px;
 				left:0px;
-				width:2px;
+				width:0px;
 				height:1000px;
 				border-left:2px solid #fff;
 				border-right:2px solid #000;
@@ -84,14 +84,14 @@
 			#TrainingVectors .Container .Offset
 			{
 				position:absolute;
-				top:-10px;
-				left:-10px;
-				width:20px;
-				height:20px;
+				top:-7px;
+				left:-7px;
+				width:14px;
+				height:14px;
 				
 				background:#F00;
 				cursor:pointer;
-				border-radius:3px;
+				border-radius:5px;
 				box-shadow:1px 1px 5px #333;
 			}
 			#TrainingVectors .TypeA .Offset
@@ -297,52 +297,50 @@ Neuron.Utilities.Delta = function(inNeuron, inTrainingSet)
 {
 	var i, j;
 	var length = 0;
-	var miss = 0;
-	var localError;
+	var localError = 0;
+	var errors = [];
 	
-	/* training for normal */
+	/* First, run the entire training set one-by-one through the neuron and record each error value into "errors" */
+	for(i=0; i<inTrainingSet.length; i++)
+	{
+		// run the training vector through the neuron
+		inNeuron.Model.Inputs = inTrainingSet[i].Pos;
+		Neuron.Utilities.Observe(inNeuron);
+		
+		// collect the error
+		errors[i] = inTrainingSet[i].Type[0] - inNeuron.Outputs.Sigmoid;
+	}
+	
+	/* For each component in the neuron's weight vector... */
 	for(i=0; i<inNeuron.Model.Weights.length; i++)
 	{
-		// get ready to collect errors for the entire training set
 		localError = 0;
 		
+		/* ...look back across the training vectors in the same component... */
 		for(j=0; j<inTrainingSet.length; j++)
 		{
-			// sample this training vector
-			inNeuron.Model.Inputs = inTrainingSet[j].Pos;
-			Neuron.Utilities.Observe(inNeuron);
-			
-			// collect the error for this training vector
-			miss = (inTrainingSet[j].Type[0] - inNeuron.Outputs.Sigmoid);
-			
-			// tally the errors
-			localError += inNeuron.Learning.RateWeights * inTrainingSet[j].Pos[i] * miss;
+			/*
+				...and sum the total error.
+				We can't just sum "errors" becuase each member of "errors" needs scaled by a unique number:
+				the component of the training vector that matches the component of the weight we are currently operating on.
+			*/
+			localError += errors[j] * inTrainingSet[j].Pos[i];
 		}
 		
-		inNeuron.Model.Weights[i] += localError;
+		/* This sum is the adjustment for this component of the weight vector */
+		inNeuron.Model.Weights[i] += localError * inNeuron.Learning.RateWeights;
 		
 		// normalization
 		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
 	}
 	
-	/* training for bias */
-	// get ready to collect errors for the entire training set
+	/* Do the same for the bias */
 	localError = 0;
-		
-	for(j=0; j<inTrainingSet.length; j++)
+	for(i=0; i<inTrainingSet.length; i++)
 	{
-		// sample this training vector
-		inNeuron.Model.Inputs = inTrainingSet[j].Pos;
-		Neuron.Utilities.Observe(inNeuron);
-		
-		// collect the error for this training vector
-		miss = (inTrainingSet[j].Type[0] - inNeuron.Outputs.Sigmoid);
-		
-		// tally the errors
-		localError += inNeuron.Learning.RateBias * miss;
+		localError += inNeuron.Learning.RateBias * errors[i];
 	}
 	inNeuron.Model.Bias -= localError;
-	
 	
 	
 	// normalization
@@ -385,13 +383,12 @@ Neuron.Setup.Observation = function(inNeuron, inWeights, inBias)
 	inNeuron.Model.Bias = inBias;
 	
 	var i = 0;
-	var sum = 0;
 	var length = 0;
 	for(i=0; i<inNeuron.Model.Weights.length; i++)
 	{
-		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
+		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
 	}
-	length = Math.sqrt(sum);
+	length = Math.sqrt(length);
 	inNeuron.Model.WeightsNormalized = [];
 	for(i=0; i<inNeuron.Model.Weights.length; i++)
 	{
@@ -412,8 +409,8 @@ NeuronViz.JQ = {};
 NeuronViz.JQ.Contianer = $("#Neurons");
 NeuronViz.CSS = {};
 NeuronViz.CSS.ClassContainer = "Container";
-NeuronViz.CSS.ClassOffset = "Offset";
 NeuronViz.CSS.ClassLine = "Line";
+NeuronViz.CSS.ClassBias = "Bias";
 NeuronViz.Create = function(inNeuron)
 {
 	var obj = {};
@@ -421,11 +418,11 @@ NeuronViz.Create = function(inNeuron)
 	
 	obj.JQ = {};
 	obj.JQ.Container = $("<div class=\""+NeuronViz.CSS.ClassContainer+"\"></div>");
-	obj.JQ.Offset = $("<div class=\""+NeuronViz.CSS.ClassOffset+"\"></div>");
 	obj.JQ.Line = $("<div class=\""+NeuronViz.CSS.ClassLine+"\"></div>");
+	obj.JQ.Bias = $("<div class=\""+NeuronViz.CSS.ClassBias+"\"></div>");
 	
-	obj.JQ.Offset.append(obj.JQ.Line);
-	obj.JQ.Container.append(obj.JQ.Offset);
+	obj.JQ.Container.append(obj.JQ.Bias);
+	obj.JQ.Container.append(obj.JQ.Line);
 	NeuronViz.JQ.Contianer.append(obj.JQ.Container);
 	
 	NeuronViz.Instances.push(obj);
@@ -447,7 +444,18 @@ NeuronViz.Update = function()
 		rad = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0]);
 		deg = rad*(180/3.14);		
 		
-		current.JQ.Container.css({left:(x)+"px", top:(y)+"px", "-webkit-transform":"rotate("+deg+"deg)"});
+		current.JQ.Line.css({left:current.Neuron.Model.Bias+"px"});
+		
+		if(current.Neuron.Model.Bias < 0)
+		{
+			current.JQ.Bias.css({width:-current.Neuron.Model.Bias+"px", left:current.Neuron.Model.Bias+"px"});
+		}
+		else
+		{
+			current.JQ.Bias.css({width:current.Neuron.Model.Bias+"px", left:"0px"});
+		}
+		
+		current.JQ.Container.css({"-webkit-transform":"rotate("+deg+"deg)", "-webkit-transform-origin": "0px 0px"});
 	};
 };
 
@@ -477,16 +485,10 @@ NeuronViz.Update = function()
 	var t6 = TrainingVector.Create([-250, -20], [1]);
 	TrainingVectorViz.Create(t6, "TypeB");
 
-
-	var Training = {};
-	Training.Index = 0;
-	Training.Neuron = n1;
-
-	Training.Timer = setInterval(function()
+	var timer = setInterval(function()
 	{
-		Neuron.Utilities.Delta(Training.Neuron, TrainingVector.Instances);
+		Neuron.Utilities.Delta(n1, TrainingVector.Instances);
 		NeuronViz.Update();
-		
 	}, 20);
 	
 	
