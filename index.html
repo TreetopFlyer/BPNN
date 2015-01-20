@@ -113,72 +113,6 @@
 		<div id="TrainingVectors"></div>
 	
 	</body>
-<!-- pad -->
-<script>
-var Pad = {};
-
-Pad.Init = function()
-{
-	Pad.JQ.Document = $(document);
-	Pad.JQ.Document.mousedown(Pad.Handler.Down);
-	Pad.JQ.Document.mouseup(Pad.Handler.Up);
-};
-
-// position vectors
-Pad.Position = {};
-Pad.Position.Update = {X:0, Y:0}; // mouse update relative (delta)
-Pad.Position.Stroke = {X:0, Y:0}; // drag stroke relative
-Pad.Position.Session = {X:0, Y:0}; // page session relative
-Pad.Position.Old = {X:0, Y:0};
-Pad.Position.New = {X:0, Y:0};
-
-// jquery elements
-Pad.JQ = {};
-Pad.JQ.Document = $();
-Pad.JQ.Drag = $();
-
-// custom handlers
-Pad.User = {};
-Pad.User.Down = function(){};
-Pad.User.Move = function(){};
-Pad.User.Up = function(){};
-
-// internal handlers
-Pad.Handler = {};
-Pad.Handler.Down = function(e)
-{
-	Pad.Position.Stroke = {X:0, Y:0};
-	Pad.Position.Old.X = e.pageX;
-	Pad.Position.Old.Y = e.pageY;
-	Pad.JQ.Document.bind("mousemove", Pad.Handler.Move);
-	
-	Pad.User.Down();
-};
-Pad.Handler.Move = function(e)
-{
-	Pad.Position.New.X = e.pageX;
-	Pad.Position.New.Y = e.pageY;
-	
-	Pad.Position.Update.X = Pad.Position.New.X - Pad.Position.Old.X;
-	Pad.Position.Update.Y = Pad.Position.New.Y - Pad.Position.Old.Y;
-	Pad.Position.Session.X += Pad.Position.Update.X
-	Pad.Position.Session.Y += Pad.Position.Update.Y;
-	Pad.Position.Stroke.X += Pad.Position.Update.X
-	Pad.Position.Stroke.Y += Pad.Position.Update.Y;
-
-	Pad.Position.Old.X = Pad.Position.New.X;
-	Pad.Position.Old.Y = Pad.Position.New.Y;
-	
-	Pad.User.Move();
-};
-Pad.Handler.Up = function(e)
-{
-	Pad.JQ.Document.unbind("mousemove", Pad.Handler.Move);
-	
-	Pad.User.Up();
-};
-Pad.Init();
-</script>
 
 <!-- training vector -->
 <script>
@@ -217,19 +151,32 @@ TrainingVectorViz.Create = function(inTrainingVector, inCSSClass)
 	obj.JQ.Container = $("<div class=\""+TrainingVectorViz.CSS.ClassContainer+" "+inCSSClass+"\"></div>");
 	obj.JQ.Offset = $("<div class=\""+TrainingVectorViz.CSS.ClassOffset+"\"></div>");
 	
-	//-webkit-transform: rotate(7deg);
+	obj.Mouse = {};
+	obj.Mouse.OldX = 0;
+	obj.Mouse.NewX = 0;
+	obj.Mouse.OldY = 0;
+	obj.Mouse.NewY = 0;
 	
 	obj.Handlers = {};
 	obj.Handlers.MouseDown = function(e)
 	{
+		obj.Mouse.NewX = e.pageX;
+		obj.Mouse.NewY = e.pageY;		
+	
 		obj.JQ.Container.unbind("mousedown", obj.Handlers.MouseDown);
 		TrainingVectorViz.JQ.Document.bind("mousemove", obj.Handlers.MouseMove);
 		TrainingVectorViz.JQ.Document.bind("mouseup", obj.Handlers.MouseUp);
 	};
 	obj.Handlers.MouseMove = function(e)
 	{
-		obj.TrainingVector.Pos[0] += Pad.Position.Update.X;
-		obj.TrainingVector.Pos[1] += Pad.Position.Update.Y;
+		obj.Mouse.OldX = obj.Mouse.NewX;
+		obj.Mouse.OldY = obj.Mouse.NewY;
+		
+		obj.Mouse.NewX = e.pageX;
+		obj.Mouse.NewY = e.pageY;
+		
+		obj.TrainingVector.Pos[0] += obj.Mouse.NewX - obj.Mouse.OldX;
+		obj.TrainingVector.Pos[1] += obj.Mouse.NewY - obj.Mouse.OldY;
 		TrainingVectorViz.Update(obj);
 	};
 	obj.Handlers.MouseUp = function(e)
@@ -461,6 +408,7 @@ NeuronViz.Update = function()
 
 </script>
 
+<!-- setup -->
 <script>
 	var n1 = Neuron.Create();
 	Neuron.Setup.Observation(n1, [Math.random(), Math.random()], Math.random()*400);
