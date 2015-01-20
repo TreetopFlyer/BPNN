@@ -408,6 +408,49 @@ NeuronViz.Update = function()
 
 </script>
 
+<!-- network -->
+<script>
+var Network = {};
+Network.Instances = [];
+Network.Create = function(inInputs)
+{
+	var i;
+	var obj = {};
+	
+	obj.Inputs = [];
+	for(i=0; i<inInputs.length; i++)
+	{
+		obj.Inputs[i] = 0;
+	};
+	
+	obj.Layers = [];
+	
+	Network.Instances.push(obj);
+	return obj;
+};
+Network.Observe = function()
+{
+	
+};
+Network.AddLayer(inNetwork, inCount, inRateWeights, inRateBias)
+{
+	var i;
+	var neuron;
+	var leading = [];
+	
+	for(i=0; i<inCount; i++)
+	{
+		neuron = Neuron.Create();
+		Neuron.Setup.Observation(neuron, [Math.random(), Math.random()], Math.random()*100);
+		Neuron.Setup.Learning(neuron, inRateWeights, inRateBias);
+		
+		NeuronViz.Create(neuron);
+	};
+	
+	inNetwork.Layers.push(leading);
+};
+</script>
+
 <!-- setup -->
 <script>
 	var n1 = Neuron.Create();
