@@ -41,11 +41,16 @@
 				border-left:1px dashed #ccc;
 			}
 			
-			#Neurons, #TrainingVectors
+			#Neurons, #TrainingVectors, #Canvas
 			{
 				position:absolute;
 				top:50%;
 				left:50%;
+			}
+			
+			#Neurons
+			{
+				display:none;
 			}
 			
 			#Neurons .Container
@@ -107,10 +112,16 @@
 	</head>
 	<body>
 	
+		<div id="Canvas">
+			<canvas></canvas>
+		</div>
 		<div id="GridH"></div>
 		<div id="GridV"></div>
 		<div id="Neurons"></div>
 		<div id="TrainingVectors"></div>
+		<div id="Networks"></div>
+		
+	
 	
 	</body>
 
@@ -203,20 +214,40 @@ TrainingVectorViz.Update = function(inTrainingVectorViz)
 <script>
 var Neuron = {};
 Neuron.Utilities = {};
-Neuron.Utilities.Observe = function(inNeuron)
+Neuron.Utilities.Observe = function(inNeuron, inInputs)
 {
 	var i = 0;
 	var sum = 0;
+	inNeuron.Model.Inputs = inInputs;
 	for(i=0; i<inNeuron.Model.WeightsNormalized.length; i++)
 	{
 		sum += inNeuron.Model.WeightsNormalized[i] * inNeuron.Model.Inputs[i];
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(1.1, -inNeuron.Outputs.Linear));
+	
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(2.3, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
+	inNeuron.Outputs.SigmoidDeriv = 1;
+	
 	if(inNeuron.Outputs.Linear < 0)
 		inNeuron.Outputs.Step = 0;
 	else
 		inNeuron.Outputs.Step = 1;
+};
+Neuron.Utilities.Normalize = function(inNeuron)
+{
+	var i;
+	var length;
+	
+	for(i=0; i<inNeuron.Model.Weights.length; i++)
+	{
+		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
+	}
+	length = Math.sqrt(length);
+	for(i=0; i<inNeuron.Model.WeightsNormalized.length; i++)
+	{
+		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
+	}
 };
 Neuron.Utilities.Learn = function(inNeuron)
 {
@@ -239,7 +270,6 @@ Neuron.Utilities.Learn = function(inNeuron)
 
 	inNeuron.Learning.Epoch++;
 };
-
 Neuron.Utilities.Delta = function(inNeuron, inTrainingSet)
 {
 	var i, j;
@@ -251,8 +281,8 @@ Neuron.Utilities.Delta = function(inNeuron, inTrainingSet)
 	for(i=0; i<inTrainingSet.length; i++)
 	{
 		// run the training vector through the neuron
-		inNeuron.Model.Inputs = inTrainingSet[i].Pos;
-		Neuron.Utilities.Observe(inNeuron);
+		//inNeuron.Model.Inputs = inTrainingSet[i].Pos;
+		Neuron.Utilities.Observe(inNeuron, inTrainingSet[i].Pos);
 		
 		// collect the error
 		errors[i] = inTrainingSet[i].Type[0] - inNeuron.Outputs.Sigmoid;
@@ -320,6 +350,7 @@ Neuron.Create = function()
 	obj.Outputs.Linear = 0;
 	obj.Outputs.Step = 0;
 	obj.Outputs.Sigmoid = 0;
+	obj.Outputs.SigmoidDeriv = 0;
 	
 	return obj;
 };
@@ -429,29 +460,102 @@ Network.Create = function(inInputs)
 	Network.Instances.push(obj);
 	return obj;
 };
-Network.Observe = function(inNetwork)
+Network.Utilities = {};
+Network.Utilities.Observe = function(inNetwork, inInputs)
 {
 	var i, j, k;
 	var previousOutputs ;
+	
+	for(i=0; i<inNetwork.Layers[0].length; i++)
+	{
+		inNetwork.Layers[0][i].Outputs.Sigmoid = inInputs[i];
+	}
+	
 	for(i=1; i<inNetwork.Layers.length; i++)
 	{
 		// collect all the outputs in the previous layer
 		previousOutputs = [];
 		for(j=0; j<inNetwork.Layers[i-1].length; j++)
 		{
-			previousOutputs[j] = inNetwork.Layers[i-1].Outputs.Sigmoid;
+			previousOutputs[j] = inNetwork.Layers[i-1][j].Outputs.Sigmoid;
 		}
 		
 		// reference them into the inputs of each neuron in the current layer
 		// then have that neuron produce an output
 		for(j=0; j<inNetwork.Layers[i].length; j++)
 		{
-			inNetwork.Layers[i][j].Inputs = previousOutputs;
-			Neuron.Utilities.Observe(inNetwork.Layers[i][j]);
+			//inNetwork.Layers[i][j].Inputs = previousOutputs;
+			Neuron.Utilities.Observe(inNetwork.Layers[i][j], previousOutputs);
+			inNetwork.Layers[i][j].Learning.Error = 0;
 		}
 	}
 };
-Network.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
+Network.Utilities.Error = function(inNetwork, inType)
+{
+	var i, j, k;
+	var currentNeuron;
+	var previousNeuron;
+	var leading = inNetwork.Layers[inNetwork.Layers.length -1];
+	for(i=0; i<leading.length; i++)
+	{
+		leading[i].Learning.Error = inType[i] - leading[i].Outputs.Sigmoid;
+	}
+	
+	for(i=inNetwork.Layers.length-1; i>=2; i--)
+	{
+		for(j=0; j<inNetwork.Layers[i].length; j++)
+		{
+			currentNeuron = inNetwork.Layers[i][j];
+			for(k=0; k<currentNeuron.Model.Inputs.length; k++)
+			{
+				previousNeuron = inNetwork.Layers[i-1][k];
+				previousNeuron.Learning.Error += currentNeuron.Model.WeightsNormalized[k] * currentNeuron.Learning.Error;
+			}
+		}
+	}
+};
+Network.Utilities.Adjust = function(inNetwork)
+{
+	var i, j, k;
+	var neuron;
+	var delta;
+	var length;
+	
+	for(i=1; i<inNetwork.Layers.length; i++)
+	{
+		for(j=0; j<inNetwork.Layers[i].length; j++)
+		{
+			length = 0;
+			neuron = inNetwork.Layers[i][j];	
+			
+			for(k=0; k<neuron.Model.Weights.length; k++)
+			{
+				delta = neuron.Learning.RateWeights * neuron.Learning.Error * neuron.Outputs.SigmoidDeriv * neuron.Model.Inputs[k];
+				neuron.Model.Weights[k] += delta;
+				length += neuron.Model.Weights[k] * neuron.Model.Weights[k];
+			}
+
+			if(length == 0)
+			{
+			}
+			else
+			{
+				for(k=0; k<neuron.Model.WeightsNormalized.length; k++)
+				{
+					neuron.Model.WeightsNormalized[k] = neuron.Model.Weights[k] / length;
+				}
+			}
+
+			
+			neuron.Model.Bias -= neuron.Learning.RateBias * neuron.Learning.Error * neuron.Outputs.SigmoidDeriv;
+			
+
+		}
+	}
+};
+
+Network.Setup = {};
+Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 {
 	var i, j;
 	var neuron;
@@ -470,7 +574,7 @@ Network.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 		}
 	
 		neuron = Neuron.Create();
-		Neuron.Setup.Observation(neuron, initialWeights, Math.random()*100); // this '100' scalar might need work
+		Neuron.Setup.Observation(neuron, initialWeights, Math.random()*100);
 		Neuron.Setup.Learning(neuron, inRateWeights, inRateBias);
 		NeuronViz.Create(neuron);
 		
@@ -480,41 +584,133 @@ Network.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 	inNetwork.Layers.push(newLayer);
 };
 </script>
+<!-- network vizualizer -->
+<script>
+var NetworkViz = {};
+NetworkViz.Instances = [];
+NetworkViz.JQ = {};
+NetworkViz.JQ.Container = $("#Networks");
+NetworkViz.CSS = {};
+NetworkViz.CSS.ClassContainer = "Container";
+NetworkViz.CSS.ClassLayer = "Layer";
+NetworkViz.CSS.ClassNeuron = "Neuron";
+NetworkViz.Create = function(inNetwork)
+{
+	var i, j, k;
+	var obj = {};
+	
+	obj.Network = inNetwork;
+	
+	obj.JQ = {};
+	obj.JQ.Container = $("<div class=\""+NetworkViz.CSS.ClassContainer+"\"></div>");
+	obj.JQ.Layers = $();
+	
+	var layer, neuron, error, weights, output;
+	for(i=0; i<inNetwork.Layers.length; i++)
+	{
+		layer = $("<div class=\""+NetworkViz.CSS.ClassLayer+"\"></div>");
+		obj.JQ.Layers = obj.JQ.Layers.add(layer);
+		obj.JQ.Container.append(layer);
+		
+		for(j=0; j<inNetwork.Layers[i].length; j++)
+		{
+			neuron = $("<div class=\""+NetworkViz.CSS.ClassNeuron+"\"></div>");
+			error = $("<div class=\"\"></div>");
+			layer.append(neuron);
+		}
+	}
+	
+	NetworkViz.Instances.push(obj);
+	return obj;
+};
+</script>
 
 <!-- setup -->
 <script>
-	var n1 = Neuron.Create();
-	Neuron.Setup.Observation(n1, [Math.random(), Math.random()], Math.random()*400);
-	Neuron.Setup.Learning(n1, 1, 10);		
-	NeuronViz.Create(n1);
-	
-	var t1 = TrainingVector.Create([100, 100], [0]);
+
+	var t1 = TrainingVector.Create([10, 20], [0]);
 	TrainingVectorViz.Create(t1, "TypeA");
 
-	var t2 = TrainingVector.Create([150, 110], [0]);
+	var t2 = TrainingVector.Create([50, 80], [0]);
 	TrainingVectorViz.Create(t2, "TypeA");
 	
-	var t3 = TrainingVector.Create([200, 180], [0]);
+	var t3 = TrainingVector.Create([-30, -70], [0]);
 	TrainingVectorViz.Create(t3, "TypeA");
 	
-	var t4 = TrainingVector.Create([-200, -180], [1]);
+	var t4 = TrainingVector.Create([-20, -20], [1]);
 	TrainingVectorViz.Create(t4, "TypeB");
 	
-	var t5 = TrainingVector.Create([-250, -180], [1]);
+	var t5 = TrainingVector.Create([-40, -40], [1]);
 	TrainingVectorViz.Create(t5, "TypeB");
 	
-	var t6 = TrainingVector.Create([-250, -20], [1]);
+	var t6 = TrainingVector.Create([100, 20], [1]);
 	TrainingVectorViz.Create(t6, "TypeB");
+	
+	var net1 = Network.Create(2);
+	Network.Setup.AddLayer(net1, 12, 0.001, 1);
+	Network.Setup.AddLayer(net1, 1, 0.001, 1);
+	
+	var index = 0;
+	var set = TrainingVector.Instances;
+	
+	var Canvas = {};
+	Canvas.JQ = $("#Canvas canvas")
+	Canvas.Context = Canvas.JQ.get(0).getContext("2d");
+	Canvas.Width = 500;
+	Canvas.Height = 400;
+	Canvas.Density = 0.5;
+	
+	Canvas.JQ.attr({width:Canvas.Width*Canvas.Density, height:Canvas.Height*Canvas.Density});
+	Canvas.JQ.css({position:"absolute", left:-Canvas.Width/2+"px", top:-Canvas.Height/2+"px", width:Canvas.Width+"px", height:Canvas.Height+"px"});
+	
+	
+	Canvas.Iterate = function(inHandler)
+	{
+		var pixelWidth = Canvas.Width*Canvas.Density;
+		var pixelHeight = Canvas.Height*Canvas.Density;
+		var x, y;
+		var worldX, worldY;
+		for(x=0; x<pixelWidth; x++)
+		{
+			for(y=0; y<pixelHeight; y++)
+			{
+				worldX = (x-pixelWidth/2)/Canvas.Density;
+				worldY = (y-pixelHeight/2)/Canvas.Density;
+				inHandler(x, y, worldX, worldY);
+			}
+		}
+	};
+	Canvas.Value = function(inValue, inX, inY)
+	{
+		inValue = Math.floor(inValue*255);
+		Canvas.Context.fillStyle = "rgba("+inValue+","+inValue+","+inValue+",255)";
+		Canvas.Context.fillRect( inX, inY, 1, 1 );
+	};
 
 	var timer = setInterval(function()
 	{
-		Neuron.Utilities.Delta(n1, TrainingVector.Instances);
+		
+		Network.Utilities.Observe(net1, set[index].Pos);
+		Network.Utilities.Error(net1, set[index].Type);
+		Network.Utilities.Adjust(net1);
 		NeuronViz.Update();
-	}, 20);
+		
+		Canvas.Iterate(function(inCanvasX, inCanvasY, inWorldX, inWorldY){
+			Network.Utilities.Observe(net1, [inWorldX, inWorldY]);
+			var output = net1.Layers[net1.Layers.length-1][0].Outputs.Sigmoid;
+			Canvas.Value(output, inCanvasX, inCanvasY);
+		});
+		
+
+		index++;
+		if(index >= set.length)
+			index = 0;
+
+		
+	}, 50);
+;
+		
 	
-	var net1 = Network.Create(2);
-	Network.AddLayer(net1, 5, 1, 10);
-	Network.AddLayer(net1, 1, 0.1, 0.1);
 	
 </script>
 
