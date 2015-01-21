@@ -97,15 +97,20 @@
 				background:#F00;
 				cursor:pointer;
 				border-radius:5px;
-				box-shadow:0px 0px 5px #f00;
+				border:1px solid #000;
+				box-shadow:0px 0px 10px #fff;
 			}
 			#TrainingVectors .TypeA .Offset
 			{
-				background:#fff;
+				background:#F00;
 			}
 			#TrainingVectors .TypeB .Offset
 			{
-				background:#000;
+				background:#0F0;
+			}
+			#TrainingVectors .TypeC .Offset
+			{
+				background:#00F;
 			}
 			
 		</style>
@@ -117,11 +122,9 @@
 		</div>
 		<div id="GridH"></div>
 		<div id="GridV"></div>
+		<div id="Networks"></div>
 		<div id="Neurons"></div>
 		<div id="TrainingVectors"></div>
-		<div id="Networks"></div>
-		
-	
 	
 	</body>
 
@@ -500,7 +503,14 @@ Network.Utilities.Tally = function(inNetwork, inType)
 {
 	for(i=0; i<inNetwork.OutputLayer.length; i++)
 	{
-		inNetwork.ErrorTally[i] += inType[i] - inNetwork.OutputLayer[i].Outputs.Sigmoid;
+		try
+		{
+			inNetwork.ErrorTally[i] += inType[i] - inNetwork.OutputLayer[i].Outputs.Sigmoid;
+		}
+		catch(e)
+		{
+			console.log(e);
+		}
 	}
 };
 Network.Utilities.Flush = function(inNetwork)
@@ -583,72 +593,68 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 </script>
 <!-- network vizualizer -->
 <script>
-
+var NetworkViz = {};
+NetworkViz.Instances = [];
+NetworkViz.JQ = {};
+NetworkViz.JQ.Contianer = $("#Neurons");
+NetworkViz.CSS = {};
+NetworkViz.CSS.ClassContainer = "Container";
+NetworkViz.CSS.ClassLine = "Line";
+NetworkViz.CSS.ClassBias = "Bias";
 </script>
 
 <!-- setup -->
 <script>
 
-	var t1 = TrainingVector.Create([-100, 50], [0]);
-	TrainingVectorViz.Create(t1, "TypeA");
-
-	var t2 = TrainingVector.Create([-50, 80], [0]);
-	TrainingVectorViz.Create(t2, "TypeA");
+	var TypeA = {};
+	TypeA.CSS = "TypeA";
+	TypeA.Vector = [1, 0, 0];
 	
-	var t3 = TrainingVector.Create([-10, 70], [0]);
-	TrainingVectorViz.Create(t3, "TypeA");
-
-	var t4 = TrainingVector.Create([20, 80], [0]);
-	TrainingVectorViz.Create(t4, "TypeA");
+	var TypeB = {};
+	TypeB.CSS = "TypeB";
+	TypeB.Vector = [0, 1, 0];
 	
-	var t5 = TrainingVector.Create([-100, -50], [0]);
-	TrainingVectorViz.Create(t5, "TypeA");
-
-	var t6 = TrainingVector.Create([-50, -60], [0]);
-	TrainingVectorViz.Create(t6, "TypeA");
+	var TypeC = {};
+	TypeC.CSS = "TypeC";
+	TypeC.Vector = [0, 0, 1];
 	
-	var t7 = TrainingVector.Create([-10, -70], [0]);
-	TrainingVectorViz.Create(t7, "TypeA");
-
-	var t8 = TrainingVector.Create([20, -80], [0]);
-	TrainingVectorViz.Create(t8, "TypeA");
+	function tv(inCoords, inType)
+	{
+		var t = TrainingVector.Create(inCoords, inType.Vector);
+		TrainingVectorViz.Create(t, inType.CSS);
+	}
 	
-	var t9 = TrainingVector.Create([-180, 0], [1]);
-	TrainingVectorViz.Create(t9, "TypeB");
-
-	var t10 = TrainingVector.Create([-120, 10], [1]);
-	TrainingVectorViz.Create(t10, "TypeB");
+	tv([-100, 50], TypeA);
+	tv([-50, 80], TypeA);
+	tv([-10, 70], TypeA);
+	tv([20, 80], TypeA);
+	tv([-100, -50], TypeA);
+	tv([-50, -60], TypeA);
+	tv([-10, -70], TypeA);
+	tv([20, -80], TypeA);
+	tv([150, 80], TypeA);
 	
-	var t11 = TrainingVector.Create([-50, -10], [1]);
-	TrainingVectorViz.Create(t11, "TypeB");
+	tv([-180, 0], TypeB);
+	tv([-120, 10], TypeB);
+	tv([-50, -10], TypeB);
+	tv([20, -20], TypeB);
+	tv([50, 6], TypeB);
+	tv([50, 100], TypeB);
+	tv([20, 108], TypeB);
+	tv([-5, 110], TypeB);
+	tv([-20, -130], TypeB);
+	tv([-30, -120], TypeB);
 	
-	var t12 = TrainingVector.Create([20, -20], [1]);
-	TrainingVectorViz.Create(t12, "TypeB");
-	
-	var t12 = TrainingVector.Create([50, 6], [1]);
-	TrainingVectorViz.Create(t12, "TypeB");
-	
-	var t13 = TrainingVector.Create([50, 100], [1]);
-	TrainingVectorViz.Create(t13, "TypeB");
-	
-	var t14 = TrainingVector.Create([20, 108], [1]);
-	TrainingVectorViz.Create(t14, "TypeB");
-	
-	var t15 = TrainingVector.Create([-5, 110], [1]);
-	TrainingVectorViz.Create(t15, "TypeB");
-	
-	var t16 = TrainingVector.Create([-20, -130], [1]);
-	TrainingVectorViz.Create(t16, "TypeB");
-	
-	var t17 = TrainingVector.Create([-30, -120], [1]);
-	TrainingVectorViz.Create(t17, "TypeB");
-	
-	var t18 = TrainingVector.Create([150, 80], [0]);
-	TrainingVectorViz.Create(t18, "TypeA");
+	tv([-200, -200], TypeC);
+	tv([-210, -190], TypeC);
+	tv([-208, -120], TypeC);
+	tv([-150, 120], TypeC);
+	tv([-130, 130], TypeC);
 	
 	var net1 = Network.Create(2);
 	Network.Setup.AddLayer(net1, 200, 0.05, 0);
-	Network.Setup.AddLayer(net1, 1, 0.05, 0);
+	Network.Setup.AddLayer(net1, 100, 0.05, 0);
+	Network.Setup.AddLayer(net1, 3, 0.05, 0);
 	
 	var i;
 	for(i=0; i<net1.Layers[1].length; i++)
@@ -684,10 +690,12 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 			}
 		}
 	};
-	Canvas.Value = function(inValue, inX, inY)
+	Canvas.SetColor = function(inR, inG, inB, inX, inY)
 	{
-		inValue = Math.floor(inValue*255);
-		Canvas.Context.fillStyle = "rgba("+inValue+","+inValue+","+inValue+",255)";
+		inR = Math.floor(inR*255);
+		inG = Math.floor(inG*255);
+		inB = Math.floor(inB*255);
+		Canvas.Context.fillStyle = "rgba("+inR+","+inG+","+inB+",255)";
 		Canvas.Context.fillRect( inX, inY, 1, 1 );
 	};
 
@@ -708,8 +716,7 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 
 		Canvas.Iterate(function(inCanvasX, inCanvasY, inWorldX, inWorldY){
 			Network.Utilities.Observe(net1, [inWorldX, inWorldY]);
-			var output = (net1.Layers[net1.Layers.length-1][0].Outputs.Linear);
-			Canvas.Value(output, inCanvasX, inCanvasY);
+			Canvas.SetColor(net1.OutputLayer[0].Outputs.Linear, net1.OutputLayer[1].Outputs.Linear, net1.OutputLayer[2].Outputs.Linear, inCanvasX, inCanvasY);
 		});		
 	};
 	Time.RoutineOuter = function()
