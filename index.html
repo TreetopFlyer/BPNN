@@ -225,7 +225,7 @@ Neuron.Utilities.Observe = function(inNeuron, inInputs)
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
 	
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(2.2, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(2, -inNeuron.Outputs.Linear));
 	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
 	
 	if(inNeuron.Outputs.Linear < 0)
@@ -581,6 +581,10 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 	inNetwork.Layers.push(newLayer);
 };
 </script>
+<!-- network vizualizer -->
+<script>
+
+</script>
 
 <!-- setup -->
 <script>
@@ -671,7 +675,7 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 		var x, y;
 		var worldX, worldY;
 		for(x=0; x<pixelWidth; x++)
-		{
+		{ 
 			for(y=0; y<pixelHeight; y++)
 			{
 				worldX = (x-pixelWidth/2)/Canvas.Density;
