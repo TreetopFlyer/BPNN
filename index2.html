@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<script src="https://code.jquery.com/jquery-1.11.2.min.js"></script>
+		<style>
+		
+		</style>
+	</head>
+	<body>
+	
+	</body>
+	<script>
+var Neuron = {};
+Neuron.Create = function()
+{
+	var obj = {};
+	
+	obj.Weights = [];
+	obj.Bias = 0;
+	obj.Error = 0;
+	
+	obj.Linear = 0;
+	obj.Sigmoid = 0;
+	obj.SigmoidDeriv = 0;
+	
+	return obj;
+};
+Neuron.Read = function(inNeuron, inSet)
+{
+	var i;
+	inNeuron.Linear = inNeuron.Bias;
+	for(i=0; i<inSet.length; i++)
+	{
+		inNeuron.Linear += inSet[i].Sigmoid * inNeuron.Weights[i];
+	}
+	inNeuron.Sigmoid = 
+};
+	</script>
+</html>
