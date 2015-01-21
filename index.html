@@ -89,15 +89,15 @@
 			#TrainingVectors .Container .Offset
 			{
 				position:absolute;
-				top:-7px;
-				left:-7px;
-				width:14px;
-				height:14px;
+				top:-4px;
+				left:-4px;
+				width:8px;
+				height:8px;
 				
 				background:#F00;
 				cursor:pointer;
 				border-radius:5px;
-				box-shadow:1px 1px 5px #333;
+				box-shadow:0px 0px 5px #f00;
 			}
 			#TrainingVectors .TypeA .Offset
 			{
@@ -225,7 +225,7 @@ Neuron.Utilities.Observe = function(inNeuron, inInputs)
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
 	
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(Math.E, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(2, -inNeuron.Outputs.Linear));
 	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
 	
 	if(inNeuron.Outputs.Linear < 0)
@@ -579,46 +579,6 @@ Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
 	inNetwork.Layers.push(newLayer);
 };
 </script>
-<!-- network vizualizer -->
-<script>
-var NetworkViz = {};
-NetworkViz.Instances = [];
-NetworkViz.JQ = {};
-NetworkViz.JQ.Container = $("#Networks");
-NetworkViz.CSS = {};
-NetworkViz.CSS.ClassContainer = "Container";
-NetworkViz.CSS.ClassLayer = "Layer";
-NetworkViz.CSS.ClassNeuron = "Neuron";
-NetworkViz.Create = function(inNetwork)
-{
-	var i, j, k;
-	var obj = {};
-	
-	obj.Network = inNetwork;
-	
-	obj.JQ = {};
-	obj.JQ.Container = $("<div class=\""+NetworkViz.CSS.ClassContainer+"\"></div>");
-	obj.JQ.Layers = $();
-	
-	var layer, neuron, error, weights, output;
-	for(i=0; i<inNetwork.Layers.length; i++)
-	{
-		layer = $("<div class=\""+NetworkViz.CSS.ClassLayer+"\"></div>");
-		obj.JQ.Layers = obj.JQ.Layers.add(layer);
-		obj.JQ.Container.append(layer);
-		
-		for(j=0; j<inNetwork.Layers[i].length; j++)
-		{
-			neuron = $("<div class=\""+NetworkViz.CSS.ClassNeuron+"\"></div>");
-			error = $("<div class=\"\"></div>");
-			layer.append(neuron);
-		}
-	}
-	
-	NetworkViz.Instances.push(obj);
-	return obj;
-};
-</script>
 
 <!-- setup -->
 <script>
@@ -635,7 +595,6 @@ NetworkViz.Create = function(inNetwork)
 	var t4 = TrainingVector.Create([20, 80], [0]);
 	TrainingVectorViz.Create(t4, "TypeA");
 	
-	
 	var t5 = TrainingVector.Create([-100, -50], [0]);
 	TrainingVectorViz.Create(t5, "TypeA");
 
@@ -648,31 +607,47 @@ NetworkViz.Create = function(inNetwork)
 	var t8 = TrainingVector.Create([20, -80], [0]);
 	TrainingVectorViz.Create(t8, "TypeA");
 	
-	
-	
 	var t9 = TrainingVector.Create([-180, 0], [1]);
 	TrainingVectorViz.Create(t9, "TypeB");
 
-	var t10 = TrainingVector.Create([-120, 0], [1]);
+	var t10 = TrainingVector.Create([-120, 10], [1]);
 	TrainingVectorViz.Create(t10, "TypeB");
 	
-	var t11 = TrainingVector.Create([-50, 0], [1]);
+	var t11 = TrainingVector.Create([-50, -10], [1]);
 	TrainingVectorViz.Create(t11, "TypeB");
 	
-	var t12 = TrainingVector.Create([20, 0], [1]);
+	var t12 = TrainingVector.Create([20, -20], [1]);
 	TrainingVectorViz.Create(t12, "TypeB");
 	
-	var t12 = TrainingVector.Create([50, 0], [1]);
+	var t12 = TrainingVector.Create([50, 6], [1]);
 	TrainingVectorViz.Create(t12, "TypeB");
+	
+	var t13 = TrainingVector.Create([50, 100], [1]);
+	TrainingVectorViz.Create(t13, "TypeB");
+	
+	var t14 = TrainingVector.Create([20, 108], [1]);
+	TrainingVectorViz.Create(t14, "TypeB");
+	
+	var t15 = TrainingVector.Create([-5, 110], [1]);
+	TrainingVectorViz.Create(t15, "TypeB");
+	
+	var t16 = TrainingVector.Create([-20, -130], [1]);
+	TrainingVectorViz.Create(t16, "TypeB");
+	
+	var t17 = TrainingVector.Create([-30, -120], [1]);
+	TrainingVectorViz.Create(t17, "TypeB");
+	
+	var t18 = TrainingVector.Create([150, 80], [0]);
+	TrainingVectorViz.Create(t18, "TypeA");
 	
 	var net1 = Network.Create(2);
-	Network.Setup.AddLayer(net1, 200, 0.2, 1);
-	Network.Setup.AddLayer(net1, 1, 0.5, 0.5);
+	Network.Setup.AddLayer(net1, 200, 0.1, 1);
+	Network.Setup.AddLayer(net1, 1, 0.1, 0.1);
 	
 	var i;
 	for(i=0; i<net1.Layers[1].length; i++)
 	{
-		net1.Layers[1][i].Model.Bias *= 400;
+		net1.Layers[1][i].Model.Bias *= 200;
 	}
 
 	
@@ -682,14 +657,11 @@ NetworkViz.Create = function(inNetwork)
 	var Canvas = {};
 	Canvas.JQ = $("#Canvas canvas")
 	Canvas.Context = Canvas.JQ.get(0).getContext("2d");
-	Canvas.Width = 500;
-	Canvas.Height = 400;
+	Canvas.Width = 600;
+	Canvas.Height = 600;
 	Canvas.Density = 0.1;
-	
 	Canvas.JQ.attr({width:Canvas.Width*Canvas.Density, height:Canvas.Height*Canvas.Density});
 	Canvas.JQ.css({position:"absolute", left:-Canvas.Width/2+"px", top:-Canvas.Height/2+"px", width:Canvas.Width+"px", height:Canvas.Height+"px"});
-	
-	
 	Canvas.Iterate = function(inHandler)
 	{
 		var pixelWidth = Canvas.Width*Canvas.Density;
@@ -716,24 +688,24 @@ NetworkViz.Create = function(inNetwork)
 	var timer = setInterval(function()
 	{
 		
+		for(index = 0; index<set.length; index++)
+		{
+		
 		Network.Utilities.Observe(net1, set[index].Pos);
 		Network.Utilities.Error(net1, set[index].Type);
 		Network.Utilities.Adjust(net1);
-		NeuronViz.Update();
+		}
+		//NeuronViz.Update();
 		
 		Canvas.Iterate(function(inCanvasX, inCanvasY, inWorldX, inWorldY){
 			Network.Utilities.Observe(net1, [inWorldX, inWorldY]);
-			var output = net1.Layers[net1.Layers.length-1][0].Outputs.Sigmoid;
+			var output = (net1.Layers[net1.Layers.length-1][0].Outputs.Linear);
 			Canvas.Value(output, inCanvasX, inCanvasY);
 		});
 		
 
-		index++;
-		if(index >= set.length)
-			index = 0;
-
 		
-	}, 20);
+	}, 30);
 ;
 		
 	
