@@ -125,7 +125,6 @@
 	</body>
 
 
-
 <!-- training vector -->
 <script>
 var TrainingVector = {};
@@ -212,146 +211,72 @@ TrainingVectorViz.Update = function(inTrainingVectorViz)
 </script>
 
 
-
 <!-- neuron -->
 <script>
 var Neuron = {};
-Neuron.Utilities = {};
-Neuron.Utilities.Observe = function(inNeuron, inInputs)
+
+/*
+Run the input vector through the neuron.
+It is assumed that the input (Neuron.Model.Inputs[]) has been set inside the neuron at this point.
+The output is processed into multiple values:
+1.) Step
+2.) Linear
+3.) Sigmoid
+4.) Sigmoid Derivative
+*/
+Neuron.Observe = function(inNeuron)
 {
 	var i = 0;
 	var sum = 0;
-	inNeuron.Model.Inputs = inInputs;
-	for(i=0; i<inNeuron.Model.WeightsNormalized.length; i++)
+	for(i=0; i<inNeuron.Model.Weights.length; i++)
 	{
-		sum += inNeuron.Model.WeightsNormalized[i] * inNeuron.Model.Inputs[i];
+		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Inputs[i];
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
-	
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(2, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(1.8, -inNeuron.Outputs.Linear));
 	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
-	
 	if(inNeuron.Outputs.Linear < 0)
 		inNeuron.Outputs.Step = 0;
 	else
 		inNeuron.Outputs.Step = 1;
 };
-Neuron.Utilities.Normalize = function(inNeuron)
+
+/*
+	Adjust the weight vector (and bias) based on the amount of error recorded at this neuron.
+	It is assumed that the error value (Neuron.Learning.Error) has already been set at this point.
+	Note that after this process, the error value is reset to 0.
+*/
+Neuron.Learn = function(inNeuron)
 {
 	var i;
-	var length;
-	
+	var weightedError = inNeuron.Learning.Rate * inNeuron.Learning.Error;
 	for(i=0; i<inNeuron.Model.Weights.length; i++)
 	{
-		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
+		inNeuron.Model.Weights[i] -= weightedError * inNeuron.Model.Inputs[i];
 	}
-	length = Math.sqrt(length);
-	for(i=0; i<inNeuron.Model.WeightsNormalized.length; i++)
-	{
-		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
-	}
-};
-Neuron.Utilities.Learn = function(inNeuron)
-{
-	var i =0;
-	var sum = 0;
-	var length = 0;
-
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		inNeuron.Model.Weights[i] += inNeuron.Learning.RateWeights * inNeuron.Learning.Error * inNeuron.Model.Inputs[i];
-		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
-	}
-	inNeuron.Model.Bias -= inNeuron.Learning.RateWeights * inNeuron.Learning.Error;
-	
-	/*
-	length = Math.sqrt(sum);
-	inNeuron.Model.WeightsNormalized = [];
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
-	}
-	*/
-	inNeuron.Model.WeightsNormalized = inNeuron.Model.Weights;
-
+	inNeuron.Model.Bias -= weightedError;
 	inNeuron.Learning.Epoch++;
 	inNeuron.Learning.Error = 0;
 };
-Neuron.Utilities.Delta = function(inNeuron, inTrainingSet)
+
+/*
+	Build a new neuron with the specified weight vector and learning rate.
+	The weight vector and bias are randomized to -1 < w < 1
+*/
+Neuron.Create = function(inInputs, inLearningRate)
 {
-	var i, j;
-	var length = 0;
-	var localError = 0;
-	var errors = [];
-	
-	/* First, run the entire training set one-by-one through the neuron and record each error value into "errors" */
-	for(i=0; i<inTrainingSet.length; i++)
-	{
-		// run the training vector through the neuron
-		//inNeuron.Model.Inputs = inTrainingSet[i].Pos;
-		Neuron.Utilities.Observe(inNeuron, inTrainingSet[i].Pos);
-		
-		// collect the error
-		errors[i] = inTrainingSet[i].Type[0] - inNeuron.Outputs.Sigmoid;
-	}
-	
-	/* For each component in the neuron's weight vector... */
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		localError = 0;
-		
-		/* ...look back across the training vectors in the same component... */
-		for(j=0; j<inTrainingSet.length; j++)
-		{
-			/*
-				...and sum the total error.
-				We can't just sum "errors" becuase each member of "errors" needs scaled by a unique number:
-				the component of the training vector that matches the component of the weight we are currently operating on.
-			*/
-			localError += errors[j] * inTrainingSet[j].Pos[i];
-		}
-		
-		/* This sum is the adjustment for this component of the weight vector */
-		inNeuron.Model.Weights[i] += localError * inNeuron.Learning.RateWeights;
-		
-		// normalization
-		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
-	}
-	
-	/* Do the same for the bias */
-	localError = 0;
-	for(i=0; i<inTrainingSet.length; i++)
-	{
-		localError += inNeuron.Learning.RateBias * errors[i];
-	}
-	inNeuron.Model.Bias -= localError;
-	
-	
-	// normalization
-	length = Math.sqrt(length);
-	inNeuron.Model.WeightsNormalized = [];
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
-	}
-	inNeuron.Learning.Epoch++;
-	
-};
-Neuron.Create = function()
-{
+	var i;
 	var obj = {};
 	
 	obj.Model = {};
 	obj.Model.Inputs = [];
 	obj.Model.Weights = [];
-	obj.Model.WeightsNormalized = [];
 	obj.Model.Bias = 0;
 
 	obj.Learning = {};
 	obj.Learning.Epoch = 0;
 	obj.Learning.Error = 0;
-	obj.Learning.RateWeights = 0;
-	obj.Learning.RateBias = 0;
+	obj.Learning.Rate = inLearningRate;
 	
 	obj.Outputs = {};
 	obj.Outputs.Linear = 0;
@@ -359,32 +284,14 @@ Neuron.Create = function()
 	obj.Outputs.Sigmoid = 0;
 	obj.Outputs.SigmoidDeriv = 0;
 	
-	return obj;
-};
-Neuron.Setup = {};
-Neuron.Setup.Observation = function(inNeuron, inWeights, inBias)
-{
-	inNeuron.Model.Weights = inWeights;
-	inNeuron.Model.Bias = inBias;
+	for(i=0; i<inInputs; i++)
+	{
+		obj.Model.Weights[i] = (Math.random() - 0.5);
+		obj.Model.Inputs[i] = 0;
+	}
+	obj.Model.Bias = (Math.random() - 0.5);
 	
-	var i = 0;
-	var length = 0;
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		length += inNeuron.Model.Weights[i] * inNeuron.Model.Weights[i];
-		inNeuron.Model.Inputs[i] = 0;
-	}
-	length = Math.sqrt(length);
-	inNeuron.Model.WeightsNormalized = [];
-	for(i=0; i<inNeuron.Model.Weights.length; i++)
-	{
-		inNeuron.Model.WeightsNormalized[i] = inNeuron.Model.Weights[i]/length;
-	}
-};
-Neuron.Setup.Learning = function(inNeuron, inRateWeights, inRateBias)
-{
-	inNeuron.Learning.RateWeights = inRateWeights;
-	inNeuron.Learning.RateBias = inRateBias;
+	return obj;
 };
 </script>
 <!-- neuron vizualizer -->
@@ -424,8 +331,8 @@ NeuronViz.Update = function()
 	{
 		current = NeuronViz.Instances[i];
 		
-		x = current.Neuron.Model.WeightsNormalized[0] * current.Neuron.Model.Bias;
-		y = current.Neuron.Model.WeightsNormalized[1] * current.Neuron.Model.Bias;
+		x = current.Neuron.Model.Weights[0] * current.Neuron.Model.Bias;
+		y = current.Neuron.Model.Weights[1] * current.Neuron.Model.Bias;
 
 		rad = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0]);
 		deg = rad*(180/3.14);		
@@ -448,7 +355,6 @@ NeuronViz.Update = function()
 </script>
 
 
-
 <!-- network -->
 <script>
 var Network = {};
@@ -463,8 +369,7 @@ Network.Create = function(inInputs)
 	obj.Layers[0] = [];
 	for(i=0; i<inInputs; i++)
 	{
-		obj.Layers[0][i] = Neuron.Create();
-		Neuron.Setup.Observation(obj.Layers[0][i], [], 0);
+		obj.Layers[0][i] = Neuron.Create(0, 0);
 	}
 	
 	obj.OutputLayer = obj.Layers[0];
@@ -473,17 +378,17 @@ Network.Create = function(inInputs)
 	Network.Instances.push(obj);
 	return obj;
 };
-Network.Utilities = {};
-Network.Utilities.Observe = function(inNetwork, inInputs)
+Network.Observe = function(inNetwork, inInput)
 {
 	var i, j, k;
 	var previousOutputs ;
 	
 	for(i=0; i<inNetwork.Layers[0].length; i++)
 	{
-		inNetwork.Layers[0][i].Outputs.Sigmoid = inInputs[i];
+		inNetwork.Layers[0][i].Outputs.Sigmoid = inInput[i];
 	}
 	
+	// starting at one up from the input layer and moving to the output layer
 	for(i=1; i<inNetwork.Layers.length; i++)
 	{
 		// collect all the outputs in the previous layer
@@ -497,96 +402,55 @@ Network.Utilities.Observe = function(inNetwork, inInputs)
 		// then have that neuron produce an output
 		for(j=0; j<inNetwork.Layers[i].length; j++)
 		{
-			Neuron.Utilities.Observe(inNetwork.Layers[i][j], previousOutputs);
+			inNetwork.Layers[i][j].Model.Inputs = previousOutputs;
+			Neuron.Observe(inNetwork.Layers[i][j]);
 		}
 	}
 };
-Network.Utilities.Tally = function(inNetwork, inType)
-{
-	for(i=0; i<inNetwork.OutputLayer.length; i++)
-	{
-		try
-		{
-			inNetwork.ErrorTally[i] += inType[i] - inNetwork.OutputLayer[i].Outputs.Sigmoid;
-		}
-		catch(e)
-		{
-			console.log(e);
-		}
-	}
-};
-Network.Utilities.Flush = function(inNetwork)
-{
-	var i;
-	inNetwork.ErrorTally = [];
-	for(i=0; i<inNetwork.OutputLayer.length; i++)
-	{
-		inNetwork.ErrorTally[i] = 0;
-	}
-}
-Network.Utilities.Error = function(inNetwork)
+Network.Learn = function(inNetwork, inOutput)
 {
 	var i, j, k;
+	var miss;
 	var currentNeuron;
 	var previousNeuron;
 	
+	// calculate the difference between what each output neuron says and what inOuptut[i] says
 	for(i=0; i<inNetwork.OutputLayer.length; i++)
 	{
-		inNetwork.OutputLayer[i].Learning.Error = inNetwork.ErrorTally[i] * inNetwork.OutputLayer[i].Outputs.SigmoidDeriv;
+		miss = inNetwork.OutputLayer[i].Outputs.Sigmoid - inOutput[i];
+		inNetwork.OutputLayer[i].Learning.Error = miss * inNetwork.OutputLayer[i].Outputs.SigmoidDeriv;
 	}
 
+	// start at the ouput layer and work back
 	for(i=inNetwork.Layers.length-1; i>=2; i--)
 	{
 		for(j=0; j<inNetwork.Layers[i].length; j++)
 		{
+			// for some neuron on the current layer...
 			currentNeuron = inNetwork.Layers[i][j];
+			
+			// ...find the nodes at are feeding into it
 			for(k=0; k<currentNeuron.Model.Inputs.length; k++)
 			{
+				// move the error at the current node back into each of its inputs, scaled by that input's weight
 				previousNeuron = inNetwork.Layers[i-1][k];
-				previousNeuron.Learning.Error += currentNeuron.Model.WeightsNormalized[k] * currentNeuron.Learning.Error * previousNeuron.Outputs.SigmoidDeriv;
+				previousNeuron.Learning.Error += currentNeuron.Model.Weights[k] * currentNeuron.Learning.Error * previousNeuron.Outputs.SigmoidDeriv;
 			}
+			
+			// now that current neuon's error has been calculated and sent back to its dependents, it can be adjusted
+			Neuron.Learn(currentNeuron);
 		}
 	}
-};
-Network.Utilities.Adjust = function(inNetwork)
-{
-	var i, j, k;
-	var neuron;
-	var delta;
-	var length;
 	
-	for(i=1; i<inNetwork.Layers.length; i++)
-	{
-		for(j=0; j<inNetwork.Layers[i].length; j++)
-		{
-			Neuron.Utilities.Learn(inNetwork.Layers[i][j]);
-		}
-	}
 };
-Network.Setup = {};
-Network.Setup.AddLayer = function(inNetwork, inCount, inRateWeights, inRateBias)
+Network.AddLayer = function(inNetwork, inCount, inRate)
 {
 	var i, j;
-	var neuron;
-	var leadingLayer = [];
 	var newLayer = [];
-	var initialWeights = [];
-	
-	leadingLayer = inNetwork.Layers[inNetwork.Layers.length-1];
 	
 	for(i=0; i<inCount; i++)
 	{
-		initialWeights = [];
-		for(j=0; j<leadingLayer.length; j++)
-		{
-			initialWeights[j] = Math.random()-0.5;
-		}
-	
-		neuron = Neuron.Create();
-		Neuron.Setup.Observation(neuron, initialWeights, Math.random());
-		Neuron.Setup.Learning(neuron, inRateWeights, inRateBias);
-		
-		newLayer[i] = neuron;
+		newLayer[i] = Neuron.Create(inNetwork.OutputLayer.length, inRate);
 	};
 
 	inNetwork.OutputLayer = newLayer;
@@ -602,7 +466,7 @@ NetworkViz.JQ.Contianer = $("#Networks");
 NetworkViz.Rasterization = {};
 NetworkViz.Rasterization.Width = 600;
 NetworkViz.Rasterization.Height = 600;
-NetworkViz.Rasterization.Density = 0.1;
+NetworkViz.Rasterization.Density = 0.2;
 NetworkViz.Rasterization.Iterate = function(inIterator)
 {
 	var pixelWidth = NetworkViz.Rasterization.Width*NetworkViz.Rasterization.Density;
@@ -642,7 +506,7 @@ NetworkViz.Create = function(inNetwork)
 	
 	obj.Iterator = function(inBitampX, inBitmapY, inScreenX, inScreenY)
 	{
-		Network.Utilities.Observe(obj.Network, [inScreenX, inScreenY]);
+		Network.Observe(obj.Network, [inScreenX, inScreenY]);
 		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Linear, obj.Network.OutputLayer[1].Outputs.Linear, obj.Network.OutputLayer[2].Outputs.Linear, inBitampX, inBitmapY);
 	};
 	
@@ -660,7 +524,6 @@ NetworkViz.Update = function()
 	}
 };
 </script>
-
 
 
 <!-- setup -->
@@ -719,39 +582,44 @@ NetworkViz.Update = function()
 		Note that layer 1's weights are spread out in that for loop
 	*/
 	var net1 = Network.Create(2);
-	Network.Setup.AddLayer(net1, 280, 0.05, 0);
-	//Network.Setup.AddLayer(net1, 80, 0.05, 0);
-	Network.Setup.AddLayer(net1, 3, 0.05, 0);
-	NetworkViz.Create(net1);
+	Network.AddLayer(net1, 200, 0.01);
+	Network.AddLayer(net1, 50, 0.01);
+	Network.AddLayer(net1, 10, 0.01);
+	Network.AddLayer(net1, 3, 0.1);
 	for(var i=0; i<net1.Layers[1].length; i++)
 	{
 		net1.Layers[1][i].Model.Bias *= 200;
 	}
-	
+	NetworkViz.Create(net1);
+
 	
 	/*
 		Update animation stuff
 	*/
 	var Time = {};
 	Time.Running = true;
-	Time.Interval = 40;
+	Time.Interval = 10;
+	Time.Count = 0;
+	Time.Wrap = 30;
 	Time.RoutineInner = function()
 	{
 		for(var i = 0; i<TrainingVector.Instances.length; i++)
 		{
-			Network.Utilities.Flush(net1);
-			Network.Utilities.Observe(net1, TrainingVector.Instances[i].Pos);
-			Network.Utilities.Tally(net1, TrainingVector.Instances[i].Type);
-			Network.Utilities.Error(net1);
-			Network.Utilities.Adjust(net1);
+			Network.Observe(net1, TrainingVector.Instances[i].Pos);
+			Network.Learn(net1, TrainingVector.Instances[i].Type);
 		}
-		NetworkViz.Update();
+		if(Time.Count == 0)
+			NetworkViz.Update();
 	};
 	Time.RoutineOuter = function()
 	{
 		Time.RoutineInner();
 		if(Time.Running)
-			setTimeout(Time.RoutineOuter, Time.Interval);	
+		{
+			setTimeout(Time.RoutineOuter, Time.Interval);
+			Time.Count++;
+			Time.Count %= Time.Wrap;
+		}
 	};
 	Time.Start = function()
 	{
@@ -766,7 +634,6 @@ NetworkViz.Update = function()
 	
 	
 </script>
-
 
 
 </html>
