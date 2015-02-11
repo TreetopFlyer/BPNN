@@ -125,6 +125,90 @@
 	</body>
 
 
+<!-- Training Set -->
+<script>
+var TrainingLayer = {};
+TrainingLayer.Create = function(inDimensions)
+{
+	var obj = {};
+	obj.Members = [];
+	obj.Min = [];
+	obj.Max = [];
+	for(var i=0; i<inDimensions; i++)
+	{
+		obj.Min[i] = 99999;
+		obj.Max[i] = -99999;
+	}
+	return obj;
+};
+TrainingLayer.Add = function(inLayer, inVector)
+{
+	var i;
+	inLayer.Members.push(inVector);
+	for(i=0; i<inLayer.Min.length; i++)
+	{
+		if(inLayer.Min[i] > inVector[i])
+			inLayer.Min[i] = inVector[i];
+			
+		if(inLayer.Max[i] < inVector[i])
+			inLayer.Max[i] = inVector[i];
+	}
+};
+TrainingLayer.Get = function(inLayer, inIndex)
+{
+	var i;
+	var v = inLayer.Members[inIndex];
+	vn = [];
+	for(i=0; i<v.length; i++)
+	{
+		vn[i] = (v[i] - inLayer.Min[i])/(inLayer.Max[i] - inLayer.Min[i]);
+	}
+	return vn;
+};
+
+
+var TrainingSet = {};
+TrainingSet.Instances = [];
+TrainingSet.Create = function(inDimensionsIn, inDimensionsOut)
+{
+	var obj = {};
+	
+	obj.Inputs = TrainingLayer.Create(inDimensionsIn);
+	obj.Input = [];
+	obj.Outputs = TrainingLayer.Create(inDimensionsOut);
+	obj.Output =[]
+	
+	obj.Index = 0;
+	obj.Epoch = 0;
+	
+	TrainingSet.Instances.push(obj);
+	return obj;
+};
+TrainingSet.Add = function(inTrainingSet, inIn, inOut)
+{
+	inTrainingSet.Inputs.push(inIn);
+	inTrainingSet.Outputs.push(inOut);
+};
+TrainingSet.Advance = function(inTrainingSet)
+{
+	inTrainingSet.Input = inTrainingSet.Inputs[inTrainingSet.Index];
+	inTrainingSet.Output = inTrainingSet.Outputs[inTrainingSet.Index];
+	inTrainingSet.Index++;
+	if(inTrainingSet.Index >= inTrainingSet.Inputs.length-1)
+	{
+		inTrainingSet.Epoch++;
+		inTrainingSet.Index = 0;
+	}
+};
+TrainingSet.Present = function(inTrainingSet, inNetwork)
+{
+	TrainingSet.Advance(inTrainingSet);
+	Network.Observe(inNetwork, inTrainingSet.Input);
+	Network.Learn(inNetwork, inTrainingSet.Output);
+};
+</script>
+
+
 <!-- training vector -->
 <script>
 var TrainingVector = {};
@@ -261,7 +345,7 @@ Neuron.Learn = function(inNeuron)
 
 /*
 	Build a new neuron with the specified weight vector and learning rate.
-	The weight vector and bias are randomized to -1 < w < 1
+	The weight vector and bias are randomized to -0.5 < w < 0.5
 */
 Neuron.Create = function(inInputs, inLearningRate)
 {
@@ -507,7 +591,7 @@ NetworkViz.Create = function(inNetwork)
 	obj.Iterator = function(inBitampX, inBitmapY, inScreenX, inScreenY)
 	{
 		Network.Observe(obj.Network, [inScreenX, inScreenY]);
-		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Linear, obj.Network.OutputLayer[1].Outputs.Linear, obj.Network.OutputLayer[2].Outputs.Linear, inBitampX, inBitmapY);
+		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Sigmoid, obj.Network.OutputLayer[1].Outputs.Sigmoid, obj.Network.OutputLayer[2].Outputs.Sigmoid, inBitampX, inBitmapY);
 	};
 	
 	NetworkViz.JQ.Contianer.append(obj.JQ.Canvas);
@@ -582,9 +666,10 @@ NetworkViz.Update = function()
 		Note that layer 1's weights are spread out in that for loop
 	*/
 	var net1 = Network.Create(2);
-	Network.AddLayer(net1, 200, 0.01);
-	Network.AddLayer(net1, 50, 0.01);
-	Network.AddLayer(net1, 10, 0.01);
+	Network.AddLayer(net1, 500, 0.1);
+	Network.AddLayer(net1, 20, 0.01);
+	Network.AddLayer(net1, 20, 0.01);
+	Network.AddLayer(net1, 20, 0.01);
 	Network.AddLayer(net1, 3, 0.1);
 	for(var i=0; i<net1.Layers[1].length; i++)
 	{
@@ -630,7 +715,7 @@ NetworkViz.Update = function()
 	{
 		Time.Running = false;
 	};
-	Time.Start();
+	//Time.Start();
 	
 	
 </script>
