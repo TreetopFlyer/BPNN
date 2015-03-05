@@ -124,6 +124,40 @@
 		<div id="TrainingVectors"></div>
 	</body>
 
+<!-- Iterator -->
+<script>
+	var Iterator = {};
+	Iterator.Instances = [];
+	Iterator.Create = function(inDelay, inHandler)
+	{
+		var obj = {};
+		
+		obj.Time = false;
+		obj.Delay = inDelay;
+		obj.Handler = inHandler;
+		
+		obj.Routine = function()
+		{
+			obj.Handler();
+			obj.Time = setTimeout(obj.Routine, obj.Delay);
+		};
+		
+		Iterator.Instances.push(obj);
+		return obj;
+	};
+	Iterator.Start = function(inIterator)
+	{
+		if(!inIterator.Time)
+		{
+			inIterator.Routine();
+		}
+	};
+	Iterator.Stop = function(inIterator)
+	{
+		clearInterval(inIterator.Time);
+		inIterator.Time = false;
+	};
+</script>
 
 <!-- Training Set -->
 <script>
@@ -169,14 +203,14 @@ TrainingLayer.Get = function(inLayer, inIndex)
 
 var TrainingSet = {};
 TrainingSet.Instances = [];
-TrainingSet.Create = function(inDimensionsIn, inDimensionsOut)
+TrainingSet.Create = function(inDimensionsOut, inDimensionsIn)
 {
 	var obj = {};
 	
 	obj.Inputs = TrainingLayer.Create(inDimensionsIn);
 	obj.Input = [];
 	obj.Outputs = TrainingLayer.Create(inDimensionsOut);
-	obj.Output =[]
+	obj.Output = [];
 	
 	obj.Index = 0;
 	obj.Epoch = 0;
@@ -186,25 +220,31 @@ TrainingSet.Create = function(inDimensionsIn, inDimensionsOut)
 };
 TrainingSet.Add = function(inTrainingSet, inIn, inOut)
 {
-	inTrainingSet.Inputs.push(inIn);
-	inTrainingSet.Outputs.push(inOut);
+	TrainingLayer.Add(inTrainingSet.Inputs, inIn);
+	TrainingLayer.Add(inTrainingSet.Outputs, inOut);
 };
 TrainingSet.Advance = function(inTrainingSet)
 {
-	inTrainingSet.Input = inTrainingSet.Inputs[inTrainingSet.Index];
-	inTrainingSet.Output = inTrainingSet.Outputs[inTrainingSet.Index];
+	inTrainingSet.Input = inTrainingSet.Inputs.Members[inTrainingSet.Index];
+	inTrainingSet.Output = inTrainingSet.Outputs.Members[inTrainingSet.Index];
 	inTrainingSet.Index++;
-	if(inTrainingSet.Index >= inTrainingSet.Inputs.length-1)
+	if(inTrainingSet.Index >= inTrainingSet.Inputs.Members.length)
 	{
 		inTrainingSet.Epoch++;
 		inTrainingSet.Index = 0;
 	}
 };
-TrainingSet.Present = function(inTrainingSet, inNetwork)
+TrainingSet.Train = function(inTrainingSet, inNetwork)
 {
 	TrainingSet.Advance(inTrainingSet);
 	Network.Observe(inNetwork, inTrainingSet.Input);
 	Network.Learn(inNetwork, inTrainingSet.Output);
+};
+TrainingSet.Flip = function(inTrainingSet)
+{
+	var temp = inTrainingSet.Outputs;
+	inTrainingSet.Outputs = inTrainingSet.Inputs;
+	inTrainingSet.Inputs = temp;
 };
 </script>
 
@@ -599,7 +639,11 @@ NetworkViz.Create = function(inNetwork)
 	
 	return obj;
 };
-NetworkViz.Update = function()
+NetworkViz.Update = function(inNetworkViz)
+{
+	NetworkViz.Rasterization.Iterate(inNetworkViz.Iterator);
+};
+NetworkViz.UpdateAll = function()
 {
 	var i;
 	for(i=0; i<NetworkViz.Instances.length; i++)
@@ -610,7 +654,61 @@ NetworkViz.Update = function()
 </script>
 
 
+<!-- New Style setup -->
+<script>
+
+	var set = TrainingSet.Create(3, 2);
+	
+	TrainingSet.Add(set, [1, 0, 0], [-100, 50]);
+	TrainingSet.Add(set, [1, 0, 0], [-100, 50]);
+	TrainingSet.Add(set, [1, 0, 0], [-50, 80]);
+	TrainingSet.Add(set, [1, 0, 0], [-10, 70]);
+	TrainingSet.Add(set, [1, 0, 0], [20, 80]);
+	TrainingSet.Add(set, [1, 0, 0], [-100, -50]);
+	TrainingSet.Add(set, [1, 0, 0], [-50, -60]);
+	TrainingSet.Add(set, [1, 0, 0], [-10, -70]);
+	TrainingSet.Add(set, [1, 0, 0], [20, -80]);
+	TrainingSet.Add(set, [1, 0, 0], [150, 80]);
+	
+	TrainingSet.Add(set, [0, 1, 0], [-180, 0]);
+	TrainingSet.Add(set, [0, 1, 0], [-120, 10]);
+	TrainingSet.Add(set, [0, 1, 0], [-50, -10]);
+	TrainingSet.Add(set, [0, 1, 0], [20, -20]);
+	TrainingSet.Add(set, [0, 1, 0], [50, 6]);
+	TrainingSet.Add(set, [0, 1, 0], [50, 100]);
+	TrainingSet.Add(set, [0, 1, 0], [20, 108]);
+	TrainingSet.Add(set, [0, 1, 0], [-5, 110]);
+	TrainingSet.Add(set, [0, 1, 0], [-20, -130]);
+	TrainingSet.Add(set, [0, 1, 0], [-30, -120]);
+	
+	TrainingSet.Add(set, [0, 0, 1], [-200, -200]);
+	TrainingSet.Add(set, [0, 0, 1], [-210, -190]);
+	TrainingSet.Add(set, [0, 0, 1], [-208, -120]);
+	TrainingSet.Add(set, [0, 0, 1], [-150, 120]);
+	TrainingSet.Add(set, [0, 0, 1], [-130, 130]);
+	
+	TrainingSet.Flip(set);
+	
+	var net = Network.Create(2);
+	Network.AddLayer(net, 50, 0.1);
+	Network.AddLayer(net, 3, 0.1);
+	var itrTraining = Iterator.Create(50, function(){
+		TrainingSet.Train(set, net);
+	});
+	Iterator.Start(itrTraining);	
+	
+	
+	var netViz = NetworkViz.Create(net);
+	var itrVisualizer = Iterator.Create(1000, function(){
+		NetworkViz.Update(netViz);
+	});
+	Iterator.Start(itrVisualizer);
+	
+	
+</script>
+
 <!-- setup -->
+<!--
 <script>
 	/*
 		buncha crap for setting up training vectors
@@ -660,6 +758,7 @@ NetworkViz.Update = function()
 	tv([-150, 120], TypeC);
 	tv([-130, 130], TypeC);
 	
+
 	
 	/*
 		Build the network.
@@ -694,7 +793,7 @@ NetworkViz.Update = function()
 			Network.Learn(net1, TrainingVector.Instances[i].Type);
 		}
 		if(Time.Count == 0)
-			NetworkViz.Update();
+			NetworkViz.UpdateAll();
 	};
 	Time.RoutineOuter = function()
 	{
@@ -719,6 +818,7 @@ NetworkViz.Update = function()
 	
 	
 </script>
+-->
 
 
 </html>
