@@ -124,6 +124,28 @@
 		<div id="TrainingVectors"></div>
 	</body>
 
+<script>
+var Range = {};
+Range.Create = function(inMin, inMax)
+{
+	var obj = {};
+	
+	obj.Min = inMin;
+	obj.Max = inMax;
+	
+	return obj;
+};
+Range.GetPercent = function(inRange, inValue)
+{
+	return (inValue - inRange.Min)/(inRange.Max - inRange.Min);
+};
+Range.SetPercent = function(inRange, inValue)
+{
+	return inRange.Min + inValue*(inRange.Max - inRange.Min);
+};
+
+</script>
+	
 <!-- Iterator -->
 <script>
 	var Iterator = {};
@@ -218,15 +240,19 @@ TrainingSet.Create = function(inDimensionsOut, inDimensionsIn)
 	TrainingSet.Instances.push(obj);
 	return obj;
 };
-TrainingSet.Add = function(inTrainingSet, inIn, inOut)
+TrainingSet.Add = function(inTrainingSet, inOut, inIn)
 {
 	TrainingLayer.Add(inTrainingSet.Inputs, inIn);
 	TrainingLayer.Add(inTrainingSet.Outputs, inOut);
 };
 TrainingSet.Advance = function(inTrainingSet)
 {
+	inTrainingSet.Input = TrainingLayer.Get(inTrainingSet.Inputs, inTrainingSet.Index);
+	inTrainingSet.Output = TrainingLayer.Get(inTrainingSet.Outputs, inTrainingSet.Index);
+	/*
 	inTrainingSet.Input = inTrainingSet.Inputs.Members[inTrainingSet.Index];
 	inTrainingSet.Output = inTrainingSet.Outputs.Members[inTrainingSet.Index];
+	*/
 	inTrainingSet.Index++;
 	if(inTrainingSet.Index >= inTrainingSet.Inputs.Members.length)
 	{
@@ -357,7 +383,7 @@ Neuron.Observe = function(inNeuron)
 		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Inputs[i];
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(1.8, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(3, -inNeuron.Outputs.Linear));
 	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
 	if(inNeuron.Outputs.Linear < 0)
 		inNeuron.Outputs.Step = 0;
@@ -383,10 +409,6 @@ Neuron.Learn = function(inNeuron)
 	inNeuron.Learning.Error = 0;
 };
 
-/*
-	Build a new neuron with the specified weight vector and learning rate.
-	The weight vector and bias are randomized to -0.5 < w < 0.5
-*/
 Neuron.Create = function(inInputs, inLearningRate)
 {
 	var i;
@@ -410,10 +432,10 @@ Neuron.Create = function(inInputs, inLearningRate)
 	
 	for(i=0; i<inInputs; i++)
 	{
-		obj.Model.Weights[i] = (Math.random() - 0.5);
+		obj.Model.Weights[i] = Math.random();
 		obj.Model.Inputs[i] = 0;
 	}
-	obj.Model.Bias = (Math.random() - 0.5);
+	obj.Model.Bias = Math.random();
 	
 	return obj;
 };
@@ -455,9 +477,11 @@ NeuronViz.Update = function()
 	{
 		current = NeuronViz.Instances[i];
 		
+		/*
 		x = current.Neuron.Model.Weights[0] * current.Neuron.Model.Bias;
 		y = current.Neuron.Model.Weights[1] * current.Neuron.Model.Bias;
-
+		*/
+		
 		rad = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0]);
 		deg = rad*(180/3.14);		
 		
@@ -588,9 +612,9 @@ NetworkViz.Instances = [];
 NetworkViz.JQ = {};
 NetworkViz.JQ.Contianer = $("#Networks");
 NetworkViz.Rasterization = {};
-NetworkViz.Rasterization.Width = 600;
-NetworkViz.Rasterization.Height = 600;
-NetworkViz.Rasterization.Density = 0.2;
+NetworkViz.Rasterization.Width = 600; // screen width
+NetworkViz.Rasterization.Height = 600; // screen height
+NetworkViz.Rasterization.Density = 0.2; // pixels-per-screen-unit
 NetworkViz.Rasterization.Iterate = function(inIterator)
 {
 	var pixelWidth = NetworkViz.Rasterization.Width*NetworkViz.Rasterization.Density;
@@ -601,8 +625,12 @@ NetworkViz.Rasterization.Iterate = function(inIterator)
 	{ 
 		for(bitmapY=0; bitmapY<pixelHeight; bitmapY++)
 		{
+			/*
 			screenX = (bitmapX-pixelWidth/2)/NetworkViz.Rasterization.Density;
 			screenY = (bitmapY-pixelHeight/2)/NetworkViz.Rasterization.Density;
+			*/
+			screenX = ((bitmapX/pixelWidth) -0.5)*5;
+			screenY = ((bitmapY/pixelHeight) -0.5)*5;
 			inIterator(bitmapX, bitmapY, screenX, screenY);
 		}
 	}
@@ -631,7 +659,7 @@ NetworkViz.Create = function(inNetwork)
 	obj.Iterator = function(inBitampX, inBitmapY, inScreenX, inScreenY)
 	{
 		Network.Observe(obj.Network, [inScreenX, inScreenY]);
-		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Sigmoid, obj.Network.OutputLayer[1].Outputs.Sigmoid, obj.Network.OutputLayer[2].Outputs.Sigmoid, inBitampX, inBitmapY);
+		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Linear, obj.Network.OutputLayer[1].Outputs.Linear, obj.Network.OutputLayer[2].Outputs.Linear, inBitampX, inBitmapY);
 	};
 	
 	NetworkViz.JQ.Contianer.append(obj.JQ.Canvas);
@@ -687,12 +715,12 @@ NetworkViz.UpdateAll = function()
 	TrainingSet.Add(set, [0, 0, 1], [-150, 120]);
 	TrainingSet.Add(set, [0, 0, 1], [-130, 130]);
 	
-	TrainingSet.Flip(set);
+	//TrainingSet.Flip(set);
 	
 	var net = Network.Create(2);
-	Network.AddLayer(net, 50, 0.1);
+	Network.AddLayer(net, 50, 0.2);
 	Network.AddLayer(net, 3, 0.1);
-	var itrTraining = Iterator.Create(50, function(){
+	var itrTraining = Iterator.Create(20, function(){
 		TrainingSet.Train(set, net);
 	});
 	Iterator.Start(itrTraining);	
@@ -703,6 +731,23 @@ NetworkViz.UpdateAll = function()
 		NetworkViz.Update(netViz);
 	});
 	Iterator.Start(itrVisualizer);
+	
+	
+	var i;
+	var v;
+	var range = Range.Create(-300, 300);
+	var normalized = [];
+	var x, y;
+	for(i=0; i<set.Inputs.Members.length; i++)
+	{
+	
+		normalized = TrainingLayer.Get(set.Inputs, i);
+	
+		x = Range.SetPercent(range, normalized[0]);
+		y = Range.SetPercent(range, normalized[1]);
+		v = TrainingVector.Create([x, y], set.Outputs.Members[i]);
+		TrainingVectorViz.Create(v, "TypeA");
+	}
 	
 	
 </script>
