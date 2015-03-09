@@ -51,6 +51,7 @@
 			
 			#Neurons
 			{
+				/* */
 				display:none;
 			}
 			
@@ -144,6 +145,23 @@ Range.SetPercent = function(inRange, inValue)
 	return inRange.Min + inValue*(inRange.Max - inRange.Min);
 };
 
+var Remapper = {};
+Remapper.Create = function(inRangeFrom, inRangeTo)
+{
+	var obj = {};
+	
+	obj.From = inRangeFrom;
+	obj.To = inRangeTo;
+	
+	return obj;
+};
+Remapper.Remap = function(inValue, inRemapper)
+{
+	var get = Range.GetPercent(inRemapper.From, inValue);
+	var set = Range.SetPercent(inRemapper.To, get);
+	return set;
+};
+
 </script>
 	
 <!-- Iterator -->
@@ -217,7 +235,7 @@ TrainingLayer.Get = function(inLayer, inIndex)
 	vn = [];
 	for(i=0; i<v.length; i++)
 	{
-		vn[i] = (v[i] - inLayer.Min[i])/(inLayer.Max[i] - inLayer.Min[i]);
+		vn[i] = (v[i] - inLayer.Min[i])/(inLayer.Max[i] - inLayer.Min[i]) - 0.5;
 	}
 	return vn;
 };
@@ -248,11 +266,7 @@ TrainingSet.Add = function(inTrainingSet, inOut, inIn)
 TrainingSet.Advance = function(inTrainingSet)
 {
 	inTrainingSet.Input = TrainingLayer.Get(inTrainingSet.Inputs, inTrainingSet.Index);
-	inTrainingSet.Output = TrainingLayer.Get(inTrainingSet.Outputs, inTrainingSet.Index);
-	/*
-	inTrainingSet.Input = inTrainingSet.Inputs.Members[inTrainingSet.Index];
 	inTrainingSet.Output = inTrainingSet.Outputs.Members[inTrainingSet.Index];
-	*/
 	inTrainingSet.Index++;
 	if(inTrainingSet.Index >= inTrainingSet.Inputs.Members.length)
 	{
@@ -266,11 +280,34 @@ TrainingSet.Train = function(inTrainingSet, inNetwork)
 	Network.Observe(inNetwork, inTrainingSet.Input);
 	Network.Learn(inNetwork, inTrainingSet.Output);
 };
-TrainingSet.Flip = function(inTrainingSet)
+TrainingSet.TrainAll = function(inTrainingSet, inNetwork)
 {
-	var temp = inTrainingSet.Outputs;
-	inTrainingSet.Outputs = inTrainingSet.Inputs;
-	inTrainingSet.Inputs = temp;
+	var i;
+	for(i=0; i<inTrainingSet.Inputs.Members.length; i++)
+	{
+		TrainingSet.Advance(inTrainingSet);
+		Network.Observe(inNetwork, inTrainingSet.Input);
+		Network.ErrorTally(inNetwork, inTrainingSet.Output);
+	}
+	Network.ErrorAdjust(inNetwork, inTrainingSet.Output);
+};
+TrainingSet.Check = function(inTrainingSet, inIndex, inNetwork) 
+{
+	inTrainingSet.Input = TrainingLayer.Get(inTrainingSet.Inputs, inIndex);
+	inTrainingSet.Output = inTrainingSet.Outputs.Members[inIndex];
+	Network.Observe(inNetwork, inTrainingSet.Input);
+
+	var output = [];
+	var i;
+	for(i=0; i<inNetwork.OutputLayer.length; i++)
+	{
+		output[i] = inNetwork.OutputLayer[i].Outputs.Sigmoid;
+	}
+	
+	console.log(" Training IN:", inTrainingSet.Input);
+	console.log("Training OUT:", inTrainingSet.Output);
+	console.log("  Actual OUT:", output);
+	
 };
 </script>
 
@@ -364,7 +401,7 @@ TrainingVectorViz.Update = function(inTrainingVectorViz)
 <!-- neuron -->
 <script>
 var Neuron = {};
-
+Neuron.Hardness = 15;
 /*
 Run the input vector through the neuron.
 It is assumed that the input (Neuron.Model.Inputs[]) has been set inside the neuron at this point.
@@ -383,7 +420,7 @@ Neuron.Observe = function(inNeuron)
 		sum += inNeuron.Model.Weights[i] * inNeuron.Model.Inputs[i];
 	}
 	inNeuron.Outputs.Linear = sum - inNeuron.Model.Bias;
-	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(3, -inNeuron.Outputs.Linear));
+	inNeuron.Outputs.Sigmoid = 	1 / (1+Math.pow(Math.E, -inNeuron.Outputs.Linear*Neuron.Hardness));
 	inNeuron.Outputs.SigmoidDeriv = inNeuron.Outputs.Sigmoid * (1 - inNeuron.Outputs.Sigmoid);
 	if(inNeuron.Outputs.Linear < 0)
 		inNeuron.Outputs.Step = 0;
@@ -432,10 +469,10 @@ Neuron.Create = function(inInputs, inLearningRate)
 	
 	for(i=0; i<inInputs; i++)
 	{
-		obj.Model.Weights[i] = Math.random();
+		obj.Model.Weights[i] = Math.random() - 0.5;
 		obj.Model.Inputs[i] = 0;
 	}
-	obj.Model.Bias = Math.random();
+	obj.Model.Bias = Math.random() - 0.5;
 	
 	return obj;
 };
@@ -471,32 +508,32 @@ NeuronViz.Update = function()
 {
 	var i;
 	var current;
-	var x, y;
-	var rad, deg;
+	var deg;
+	var cssContainer;
+	var cssLine;
+	var cssBias;
+
 	for(i=0; i<NeuronViz.Instances.length; i++)
 	{
 		current = NeuronViz.Instances[i];
+		reMappedBias = current.Neuron.Model.Bias*300;
+		deg = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0])*(180/3.14);
 		
-		/*
-		x = current.Neuron.Model.Weights[0] * current.Neuron.Model.Bias;
-		y = current.Neuron.Model.Weights[1] * current.Neuron.Model.Bias;
-		*/
-		
-		rad = Math.atan2(current.Neuron.Model.Weights[1], current.Neuron.Model.Weights[0]);
-		deg = rad*(180/3.14);		
-		
-		current.JQ.Line.css({left:current.Neuron.Model.Bias+"px"});
+		cssContainer = {"-webkit-transform":"rotate("+deg+"deg)", "-webkit-transform-origin": "0px 0px"};
+		cssLine = {left:reMappedBias+"px"};
 		
 		if(current.Neuron.Model.Bias < 0)
 		{
-			current.JQ.Bias.css({width:-current.Neuron.Model.Bias+"px", left:current.Neuron.Model.Bias+"px"});
+			cssBias = {width:-reMappedBias+"px", left:reMappedBias+"px"};
 		}
 		else
 		{
-			current.JQ.Bias.css({width:current.Neuron.Model.Bias+"px", left:"0px"});
+			cssBias = {width:reMappedBias+"px", left:"0px"};
 		}
 		
-		current.JQ.Container.css({"-webkit-transform":"rotate("+deg+"deg)", "-webkit-transform-origin": "0px 0px"});
+		current.JQ.Container.css(cssContainer);
+		current.JQ.Line.css(cssLine);		
+		current.JQ.Bias.css(cssBias);
 	};
 };
 
@@ -555,22 +592,30 @@ Network.Observe = function(inNetwork, inInput)
 		}
 	}
 };
-Network.Learn = function(inNetwork, inOutput)
+
+Network.ErrorTally = function(inNetwork, inOutput)
 {
-	var i, j, k;
-	var miss;
-	var currentNeuron;
-	var previousNeuron;
-	
-	// calculate the difference between what each output neuron says and what inOuptut[i] says
 	for(i=0; i<inNetwork.OutputLayer.length; i++)
 	{
 		miss = inNetwork.OutputLayer[i].Outputs.Sigmoid - inOutput[i];
-		inNetwork.OutputLayer[i].Learning.Error = miss * inNetwork.OutputLayer[i].Outputs.SigmoidDeriv;
+		inNetwork.OutputLayer[i].Learning.Error += miss ;
 	}
-
+};
+Network.ErrorAdjust = function(inNetwork)
+{
+	var i, j, k;
+	var currentNeuron;
+	var previousNeuron;
+	
+	var error = [];
+	for(i=0; i<inNetwork.OutputLayer.length; i++)
+	{
+		error[i] = inNetwork.OutputLayer[i].Learning.Error;
+	}
+	console.log(error);
+	
 	// start at the ouput layer and work back
-	for(i=inNetwork.Layers.length-1; i>=2; i--)
+	for(i=inNetwork.Layers.length-1; i>=1; i--)
 	{
 		for(j=0; j<inNetwork.Layers[i].length; j++)
 		{
@@ -585,11 +630,46 @@ Network.Learn = function(inNetwork, inOutput)
 				previousNeuron.Learning.Error += currentNeuron.Model.Weights[k] * currentNeuron.Learning.Error * previousNeuron.Outputs.SigmoidDeriv;
 			}
 			
-			// now that current neuon's error has been calculated and sent back to its dependents, it can be adjusted
+			// now that current neuon's error has been calculated and sent back to its dependents, it can be adjusted}
 			Neuron.Learn(currentNeuron);
 		}
 	}
+};
+Network.Learn = function(inNetwork, inOutput)
+{
+	var i, j, k;
+	var miss;
+	var currentNeuron;
+	var previousNeuron;
 	
+	// calculate the difference between what each output neuron says and what inOuptut[i] is
+
+	for(i=0; i<inNetwork.OutputLayer.length; i++)
+	{
+		miss = inNetwork.OutputLayer[i].Outputs.Sigmoid - inOutput[i];
+		inNetwork.OutputLayer[i].Learning.Error = miss * inNetwork.OutputLayer[i].Outputs.SigmoidDeriv;
+	}
+
+	// start at the ouput layer and work back
+	for(i=inNetwork.Layers.length-1; i>=1; i--)
+	{
+		for(j=0; j<inNetwork.Layers[i].length; j++)
+		{
+			// for some neuron on the current layer...
+			currentNeuron = inNetwork.Layers[i][j];
+			
+			// ...find the nodes at are feeding into it
+			for(k=0; k<currentNeuron.Model.Inputs.length; k++)
+			{
+				// move the error at the current node back into each of its inputs, scaled by that input's weight
+				previousNeuron = inNetwork.Layers[i-1][k];
+				previousNeuron.Learning.Error += currentNeuron.Model.Weights[k] * currentNeuron.Learning.Error * previousNeuron.Outputs.SigmoidDeriv;
+			}
+			
+			// now that current neuon's error has been calculated and sent back to its dependents, it can be adjusted}
+			Neuron.Learn(currentNeuron);
+		}
+	}
 };
 Network.AddLayer = function(inNetwork, inCount, inRate)
 {
@@ -614,24 +694,20 @@ NetworkViz.JQ.Contianer = $("#Networks");
 NetworkViz.Rasterization = {};
 NetworkViz.Rasterization.Width = 600; // screen width
 NetworkViz.Rasterization.Height = 600; // screen height
-NetworkViz.Rasterization.Density = 0.2; // pixels-per-screen-unit
+NetworkViz.Rasterization.Density = 0.1; // pixels-per-screen-unit
 NetworkViz.Rasterization.Iterate = function(inIterator)
 {
 	var pixelWidth = NetworkViz.Rasterization.Width*NetworkViz.Rasterization.Density;
 	var pixelHeight = NetworkViz.Rasterization.Height*NetworkViz.Rasterization.Density;
 	var bitmapX, bitmapY;
-	var screenX, screenY;
+	var networkX, networkY;
 	for(bitmapX=0; bitmapX<pixelWidth; bitmapX++)
 	{ 
 		for(bitmapY=0; bitmapY<pixelHeight; bitmapY++)
 		{
-			/*
-			screenX = (bitmapX-pixelWidth/2)/NetworkViz.Rasterization.Density;
-			screenY = (bitmapY-pixelHeight/2)/NetworkViz.Rasterization.Density;
-			*/
-			screenX = ((bitmapX/pixelWidth) -0.5)*5;
-			screenY = ((bitmapY/pixelHeight) -0.5)*5;
-			inIterator(bitmapX, bitmapY, screenX, screenY);
+			networkX = -1 +(bitmapX/pixelWidth)*(2);
+			networkY = -1 +(bitmapY/pixelHeight)*(2);
+			inIterator(bitmapX, bitmapY, networkX, networkY);
 		}
 	}
 };
@@ -656,10 +732,10 @@ NetworkViz.Create = function(inNetwork)
 	
 	obj.Context = obj.JQ.Canvas.get(0).getContext("2d");
 	
-	obj.Iterator = function(inBitampX, inBitmapY, inScreenX, inScreenY)
+	obj.Iterator = function(inBitampX, inBitmapY, inNetworkX, inNetworkY)
 	{
-		Network.Observe(obj.Network, [inScreenX, inScreenY]);
-		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Linear, obj.Network.OutputLayer[1].Outputs.Linear, obj.Network.OutputLayer[2].Outputs.Linear, inBitampX, inBitmapY);
+		Network.Observe(obj.Network, [inNetworkX, inNetworkY]);
+		NetworkViz.Rasterization.SetColor(obj.Context, obj.Network.OutputLayer[0].Outputs.Sigmoid, obj.Network.OutputLayer[1].Outputs.Sigmoid, obj.Network.OutputLayer[2].Outputs.Sigmoid, inBitampX, inBitmapY);
 	};
 	
 	NetworkViz.JQ.Contianer.append(obj.JQ.Canvas);
@@ -687,7 +763,6 @@ NetworkViz.UpdateAll = function()
 
 	var set = TrainingSet.Create(3, 2);
 	
-	TrainingSet.Add(set, [1, 0, 0], [-100, 50]);
 	TrainingSet.Add(set, [1, 0, 0], [-100, 50]);
 	TrainingSet.Add(set, [1, 0, 0], [-50, 80]);
 	TrainingSet.Add(set, [1, 0, 0], [-10, 70]);
@@ -717,38 +792,58 @@ NetworkViz.UpdateAll = function()
 	
 	//TrainingSet.Flip(set);
 	
+
+	
+	Neuron.Hardness = 15;
 	var net = Network.Create(2);
-	Network.AddLayer(net, 50, 0.2);
-	Network.AddLayer(net, 3, 0.1);
-	var itrTraining = Iterator.Create(20, function(){
-		TrainingSet.Train(set, net);
+	Network.AddLayer(net, 300, 0.0001);
+	Network.AddLayer(net, 3, 0.0001);
+	
+	for(i=0; i<net.Layers[1].length; i++)
+	{
+		NeuronViz.Create(net.Layers[1][i]);
+	}	
+	NeuronViz.Update();
+	NetworkViz.Create(net);
+	
+	var itrTraining = Iterator.Create(50, function(){
+		
+		TrainingSet.TrainAll(set, net);
+		//TrainingSet.Train(set, net);
+		NeuronViz.Update();
+		NetworkViz.UpdateAll();
 	});
 	Iterator.Start(itrTraining);	
-	
-	
-	var netViz = NetworkViz.Create(net);
-	var itrVisualizer = Iterator.Create(1000, function(){
-		NetworkViz.Update(netViz);
-	});
-	Iterator.Start(itrVisualizer);
+
+
 	
 	
 	var i;
 	var v;
-	var range = Range.Create(-300, 300);
 	var normalized = [];
-	var x, y;
+	var output;
+	var cssClass = "";
 	for(i=0; i<set.Inputs.Members.length; i++)
 	{
-	
 		normalized = TrainingLayer.Get(set.Inputs, i);
-	
-		x = Range.SetPercent(range, normalized[0]);
-		y = Range.SetPercent(range, normalized[1]);
-		v = TrainingVector.Create([x, y], set.Outputs.Members[i]);
-		TrainingVectorViz.Create(v, "TypeA");
+		output = set.Outputs.Members[i];
+		v = TrainingVector.Create([normalized[0]*300, normalized[1]*300], output);
+		if(output[0] == 1)
+		{
+			cssClass = "A";
+		}
+		if(output[1] == 1)
+		{
+			cssClass = "B";
+		}
+		if(output[2] == 1)
+		{
+			cssClass = "C";
+		}
+		TrainingVectorViz.Create(v, "Type"+cssClass);
 	}
-	
+
+
 	
 </script>
 
